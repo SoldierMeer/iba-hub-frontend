@@ -90,11 +90,20 @@ export default function Navbar() {
       await api.get('/auth/logout');
       localStorage.clear();
       sessionStorage.clear();
-      window.location.href = '/';
+
+      // 🚀 THE FIX: Destroy the Next.js Server Component cookie
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed, forcing clean-up:', error);
       localStorage.clear();
-      window.location.href = '/login';
+      sessionStorage.clear();
+
+      // 🚀 THE FIX: Ensure the cookie is destroyed even if the API call fails
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+      window.location.href = '/';
     }
   };
 

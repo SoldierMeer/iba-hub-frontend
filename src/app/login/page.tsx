@@ -28,15 +28,28 @@ export default function LoginPage() {
 
     try {
       const response = await api.post('/auth/login', formData);
-      if (response.data.success) {
+      
+      if (response.data && response.data.success) {
+        // 1. Force the browser to grab the token
+        const userToken = response.data.token;
         
-        // 🚀 THE FIX: Save the Bearer token to localStorage so our new api.ts interceptor can use it!
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
+        // 2. Only proceed if we actually got a string back
+        if (typeof userToken === 'string' && userToken.length > 10) {
+           
+           // 3. Force-write to window.localStorage to bypass React state scoping
+           if (typeof window !== 'undefined') {
+            // Save for the Client (Axios)
+            window.localStorage.setItem('token', userToken);
+            
+            // 🚀 NEW: Save for the Next.js Server Components!
+            document.cookie = `token=${userToken}; path=/; max-age=2592000; SameSite=Lax`;
+            
+            window.location.href = '/'; 
+            return; 
+          }
+        } else {
+           setError("Login succeeded, but the server didn't provide a token.");
         }
-
-        // Redirect straight to the universal Landing/Dashboard page
-        window.location.href = '/';
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid credentials');

@@ -33,15 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const fetchUser = async () => {
+      setIsLoading(true); // 🚀 Ensure loading state is active while fetching!
       try {
         const res = await api.get('/users/me', {
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
         });
-        console.log("SUCCESS: User fetched:", res.data);
         setUser(res.data?.data || res.data?.user || res.data);
         setIsAuthenticated(true);
       } catch (error) {
-        console.error("FAIL: Could not fetch user (API returned 401/error):", error);
         setUser(null);
         setIsAuthenticated(false);
       } finally {
@@ -50,13 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     
     // Don't fetch on auth pages
-    if (pathname === '/login' || pathname === '/register') {
+    if (window.location.pathname === '/login' || window.location.pathname === '/register') {
         setIsLoading(false);
         return;
     }
     
     fetchUser();
-  }, [pathname]);
+  }, []); // 🚀 REMOVED pathname! Now it only checks once when the app mounts.
 
   // 🚀 THE MAGIC FUNCTION
   const requireAuth = (action: Function) => {

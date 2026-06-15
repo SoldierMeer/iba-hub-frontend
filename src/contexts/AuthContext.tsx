@@ -33,7 +33,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const fetchUser = async () => {
-      setIsLoading(true); // 🚀 Ensure loading state is active while fetching!
+      // 🚀 ONLY show the loading screen if we don't already have a user.
+      // This prevents the screen from flickering when you click between pages.
+      if (!user) {
+        setIsLoading(true); 
+      }
+      
       try {
         const res = await api.get('/users/me', {
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
@@ -55,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     fetchUser();
-  }, []); // 🚀 REMOVED pathname! Now it only checks once when the app mounts.
+  }, [pathname]); // 🚀 ADDED 'pathname' BACK! Now it updates properly when you navigate.
 
   // 🚀 THE MAGIC FUNCTION
   const requireAuth = (action: Function) => {

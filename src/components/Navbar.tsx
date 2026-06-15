@@ -13,12 +13,13 @@ import {
 } from 'lucide-react';
 
 import { optimizeImage } from '@/lib/cloudinary';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Navbar() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const pathname = usePathname();
   const router = useRouter();
+  // ✅ ADD THIS INSTEAD
+  const { user, isAuthenticated } = useAuth();
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,26 +30,6 @@ export default function Navbar() {
 
   // 🚀 NEW: Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await api.get('/users/me', {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          }
-        });
-        setIsAuthenticated(true);
-        setUser(res.data?.data || res.data?.user || res.data);
-      } catch (error) {
-        setIsAuthenticated(false);
-        setUser(null);
-      }
-    };
-    checkAuth();
-  }, [pathname]);
 
   // 🚀 Close mobile menu and dropdown automatically when route changes
   useEffect(() => {
@@ -105,8 +86,6 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      setIsAuthenticated(false);
-      setUser(null);
       await api.get('/auth/logout');
       localStorage.clear();
       sessionStorage.clear();

@@ -10,8 +10,8 @@ interface AuthContextType {
   user: any | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  // 🚀 TWEAKED: Now accepts both normal AND async functions perfectly!
   requireAuth: (action: Function) => void; 
+  logout: () => void; // 🚀 ADDED: Exported logout function
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
   requireAuth: () => {},
+  logout: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -34,7 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchUser = async () => {
       // 🚀 ONLY show the loading screen if we don't already have a user.
-      // This prevents the screen from flickering when you click between pages.
       if (!user) {
         setIsLoading(true); 
       }
@@ -46,21 +46,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(res.data?.data || res.data?.user || res.data);
         setIsAuthenticated(true);
       } catch (error) {
+        // If the token is invalid or missing, clear everything
         setUser(null);
         setIsAuthenticated(false);
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+        }
       } finally {
         setIsLoading(false);
       }
     };
     
     // Don't fetch on auth pages
-    if (window.location.pathname === '/login' || window.location.pathname === '/register') {
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname === '/register')) {
         setIsLoading(false);
         return;
     }
     
     fetchUser();
-  }, [pathname]); // 🚀 ADDED 'pathname' BACK! Now it updates properly when you navigate.
+  }, [pathname]);
 
   // 🚀 THE MAGIC FUNCTION
   const requireAuth = (action: Function) => {
@@ -71,8 +75,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // 🚀 NEW LOGOUT FUNCTION
+  const logout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token'); // Destroy the token
+      setUser(null);
+      setIsAuthenticated(false);
+      window.location.href = '/login'; // Force redirect to clear cache state
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, requireAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, requireAuth, logout }}>
       {children}
       
       {/* 🚀 GLOBAL GUEST INTERCEPTION MODAL */}

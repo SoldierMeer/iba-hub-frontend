@@ -4,32 +4,37 @@ const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
   headers: {
     'Content-Type': 'application/json',
-    // 🚀 Removed the strict 'no-cache' headers so the browser can breathe
   },
-  withCredentials: true,
+  // Note: withCredentials: true is no longer strictly required for Bearer tokens,
+  // but it doesn't hurt to leave it if other endpoints rely on it.
+  withCredentials: true, 
 });
 
-// 🚀 PROMISE DEDUPLICATOR
-// Prevents 6 components from making 6 identical API calls at the same time
-// 🚀 PROMISE DEDUPLICATOR
-const pendingRequests = new Map();
+// 🚀 NEW: Automatically attach the token to every request
+api.interceptors.request.use((config) => {
+  // Safety check for Next.js SSR
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
 
+// 🚀 PROMISE DEDUPLICATOR (Kept perfectly intact!)
+const pendingRequests = new Map();
 const originalGet = api.get;
 
 api.get = async (url: string, config?: any) => {
-  // 🚀 THE FIX: Serialize the params into the key!
-  // Now '/complaints?category=IT' and '/complaints?category=Academics' have different keys.
   const queryString = config?.params ? JSON.stringify(config.params) : '';
   const key = `${url}-${queryString}`;
 
-  // If a request for this EXACT url + exact parameters is in-flight, return the existing promise
   if (pendingRequests.has(key)) {
     return pendingRequests.get(key);
   }
 
-  // Otherwise, fire the network request and store the promise
   const promise = originalGet(url, config).finally(() => {
-    // Clear the promise from memory after 2 seconds.
     setTimeout(() => pendingRequests.delete(key), 2000);
   });
 

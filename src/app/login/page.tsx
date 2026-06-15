@@ -29,7 +29,13 @@ export default function LoginPage() {
     try {
       const response = await api.post('/auth/login', formData);
       if (response.data.success) {
-        // 👈 CHANGED: Redirect straight to the universal Landing/Dashboard page
+        
+        // 🚀 THE FIX: Save the Bearer token to localStorage so our new api.ts interceptor can use it!
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+        }
+
+        // Redirect straight to the universal Landing/Dashboard page
         window.location.href = '/';
       }
     } catch (err: any) {

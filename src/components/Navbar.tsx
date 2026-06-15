@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ export default function Navbar() {
   const router = useRouter();
   // ✅ ADD THIS INSTEAD
   const { user, isAuthenticated } = useAuth();
+  const [isPending, startTransition] = useTransition();
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,55 +98,69 @@ export default function Navbar() {
     }
   };
 
+  // 🚀 NEW: This prevents the 2-second freeze on page load!
+  const navigateInstantly = (path: string) => {
+    setIsMobileMenuOpen(false); // Close mobile menu if open
+    startTransition(() => {
+      router.push(path);
+    });
+  };
+
   const handleResultClick = (path: string) => {
     setShowDropdown(false);
-    setIsMobileMenuOpen(false);
     setSearchQuery('');
-    router.push(path);
+    navigateInstantly(path); // 🚀 UPDATED
   };
 
   const hasResults = searchResults.users.length > 0 || searchResults.posts.length > 0 || 
                      searchResults.resources.length > 0 || searchResults.complaints.length > 0;
 
-  // Premium Desktop Nav Link
-  const NavLink = ({ href, label }: { href: string, label: string }) => {
-    const isActive = pathname.startsWith(href);
-    return (
-      <Link 
-        href={href} 
-        className={`relative h-full flex items-center px-3 text-sm font-bold transition-colors duration-200 ${
-          isActive ? 'text-[#0f172a]' : 'text-slate-500 hover:text-slate-800'
-        }`}
-      >
+ // Premium Desktop Nav Link
+ const NavLink = ({ href, label }: { href: string, label: string }) => {
+  const isActive = pathname.startsWith(href);
+  return (
+    <a 
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        navigateInstantly(href);
+      }}
+      className={`relative h-full flex items-center px-3 text-sm font-bold transition-colors duration-200 cursor-pointer ${
+        isActive ? 'text-[#0f172a]' : 'text-slate-500 hover:text-slate-800'
+      }`}
+    >
+      {label}
+      {isActive && (
+        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#0f172a] rounded-t-full shadow-[0_-2px_10px_rgba(15,23,42,0.1)] animate-in fade-in zoom-in-95 duration-300" />
+      )}
+    </a>
+  );
+};
+
+// Premium Mobile Nav Link
+const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: string, icon: any }) => {
+  const isActive = pathname.startsWith(href);
+  return (
+    <a 
+      href={href} 
+      onClick={(e) => {
+        e.preventDefault();
+        navigateInstantly(href);
+      }}
+      className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold cursor-pointer ${
+        isActive 
+          ? 'bg-[#0f172a] text-white shadow-md' 
+          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-100 shadow-sm'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
         {label}
-        {isActive && (
-          <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#0f172a] rounded-t-full shadow-[0_-2px_10px_rgba(15,23,42,0.1)] animate-in fade-in zoom-in-95 duration-300" />
-        )}
-      </Link>
-    );
-  };
-
-  // 🚀 Premium Mobile Nav Link
-  const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: string, icon: any }) => {
-    const isActive = pathname.startsWith(href);
-    return (
-      <Link 
-        href={href} 
-        className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold ${
-          isActive 
-            ? 'bg-[#0f172a] text-white shadow-md' 
-            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-100 shadow-sm'
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-          {label}
-        </div>
-        <ChevronRight className={`w-4 h-4 ${isActive ? 'text-white/70' : 'text-slate-300'}`} />
-      </Link>
-    );
-  };
-
+      </div>
+      <ChevronRight className={`w-4 h-4 ${isActive ? 'text-white/70' : 'text-slate-300'}`} />
+    </a>
+  );
+};
   return (
     <>
       <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm transition-all h-16">

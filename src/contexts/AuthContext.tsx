@@ -37,9 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await api.get('/users/me', {
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
         });
+        console.log("SUCCESS: User fetched:", res.data);
         setUser(res.data?.data || res.data?.user || res.data);
         setIsAuthenticated(true);
       } catch (error) {
+        console.error("FAIL: Could not fetch user (API returned 401/error):", error);
         setUser(null);
         setIsAuthenticated(false);
       } finally {

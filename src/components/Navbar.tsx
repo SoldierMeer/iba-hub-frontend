@@ -116,16 +116,14 @@ export default function Navbar() {
                      searchResults.resources.length > 0 || searchResults.complaints.length > 0;
 
  // Premium Desktop Nav Link
- const NavLink = ({ href, label }: { href: string, label: string }) => {
+// Revert back to standard Next.js Links to trigger loading.tsx
+const NavLink = ({ href, label }: { href: string, label: string }) => {
   const isActive = pathname.startsWith(href);
   return (
-    <a 
-      href={href}
-      onClick={(e) => {
-        e.preventDefault();
-        navigateInstantly(href);
-      }}
-      className={`relative h-full flex items-center px-3 text-sm font-bold transition-colors duration-200 cursor-pointer ${
+    <Link 
+      href={href} 
+      onClick={() => setIsMobileMenuOpen(false)}
+      className={`relative h-full flex items-center px-3 text-sm font-bold transition-colors duration-200 ${
         isActive ? 'text-[#0f172a]' : 'text-slate-500 hover:text-slate-800'
       }`}
     >
@@ -133,21 +131,17 @@ export default function Navbar() {
       {isActive && (
         <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#0f172a] rounded-t-full shadow-[0_-2px_10px_rgba(15,23,42,0.1)] animate-in fade-in zoom-in-95 duration-300" />
       )}
-    </a>
+    </Link>
   );
 };
 
-// Premium Mobile Nav Link
 const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: string, icon: any }) => {
   const isActive = pathname.startsWith(href);
   return (
-    <a 
+    <Link 
       href={href} 
-      onClick={(e) => {
-        e.preventDefault();
-        navigateInstantly(href);
-      }}
-      className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold cursor-pointer ${
+      onClick={() => setIsMobileMenuOpen(false)}
+      className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold ${
         isActive 
           ? 'bg-[#0f172a] text-white shadow-md' 
           : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-100 shadow-sm'
@@ -158,9 +152,11 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
         {label}
       </div>
       <ChevronRight className={`w-4 h-4 ${isActive ? 'text-white/70' : 'text-slate-300'}`} />
-    </a>
+    </Link>
   );
 };
+
+
   return (
     <>
       <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm transition-all h-16">

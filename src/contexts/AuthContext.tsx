@@ -40,9 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       try {
-        const res = await api.get('/users/me', {
-          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-        });
+        const res = await api.get('/users/me');
         setUser(res.data?.data || res.data?.user || res.data);
         setIsAuthenticated(true);
       } catch (error) {

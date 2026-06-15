@@ -11,6 +11,7 @@ import {
   BellOff, BellRing, Ban, Flag, UserPlus, UserCheck, AlertTriangle, ArrowLeft,
   Edit3, ArrowRight, Hourglass, GraduationCap, Image as ImageIcon, Loader2
 } from 'lucide-react';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 import { useSearchParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -507,6 +508,7 @@ function ConnectEngine() {
 
   return (
     <>
+    <ProtectedRoute>
     <title>Connect & Chat | IBA Hub</title>
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans relative">
       
@@ -863,6 +865,7 @@ function ConnectEngine() {
       )}
 
     </div>
+    </ProtectedRoute>
     </>
   );
 }

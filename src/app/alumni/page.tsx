@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import UserProfileModal from '@/components/UserProfileModal'; 
 import { optimizeImage } from '@/lib/cloudinary';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 interface Alumni {
   _id: string;
@@ -89,6 +90,7 @@ export default function AlumniPage() {
 
   return (
     <>
+    <ProtectedRoute>
     <title>Alumni Directory | IBA Hub</title>
     <div className="min-h-screen bg-[#f8fafc] font-sans pb-16">
       
@@ -273,6 +275,7 @@ export default function AlumniPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
     </>
   );
 }

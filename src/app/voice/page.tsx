@@ -12,6 +12,7 @@ import UserProfileModal from '@/components/UserProfileModal';
 import { useAuth } from '@/contexts/AuthContext'; 
 import toast from 'react-hot-toast';
 import { optimizeImage } from '@/lib/cloudinary';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 interface Author {
   _id: string;
@@ -313,6 +314,7 @@ export default function VoicePage() {
 
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-[#f8fafc] pb-16">
       
       <UserProfileModal 
@@ -871,5 +873,6 @@ export default function VoicePage() {
       )}
 
     </div>
+    </ProtectedRoute>
   );
 }

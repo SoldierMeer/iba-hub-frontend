@@ -101,16 +101,32 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const [userRes, activityRes] = await Promise.all([
-          api.get('/users/me'),
-          api.get('/users/activity') 
-        ]);
-        
+        // 1. Fetch the user first (Sequential execution)
+        const userRes = await api.get('/users/me');
         const userData = userRes.data?.data || userRes.data?.user || userRes.data;
+        
         setUser(userData);
-        setActivity(activityRes.data?.data || []);
-        setTotalPoints(activityRes.data?.totalPoints || 0); 
-
+        const userId = userData?._id;
+    
+        // 2. Only fetch activity if we successfully got a userId
+        let activityData = [];
+        let fetchedPoints = 0;
+    
+        if (userId) {
+          try {
+            const activityRes = await api.get(`/users/activity?userId=${userId}`);
+            activityData = activityRes.data?.data || [];
+            fetchedPoints = activityRes.data?.totalPoints || 0;
+          } catch (activityError) {
+            // We log it, but don't stop the whole page from loading if activity fails
+            console.error("Activity could not be loaded:", activityError);
+          }
+        }
+    
+        setActivity(activityData);
+        setTotalPoints(fetchedPoints);
+    
+        // 3. Set form data
         setFormData({
           bio: userData.bio || '',
           department: userData.department || '',
@@ -125,6 +141,7 @@ export default function ProfilePage() {
           instagram: userData.instagram || '',
           github: userData.github || ''
         });
+    
       } catch (error: any) {
         if (error.response?.status === 401) {
           window.location.href = '/login';

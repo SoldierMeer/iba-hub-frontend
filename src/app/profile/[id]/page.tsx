@@ -124,7 +124,7 @@ export default function ProfilePage() {
 
         // 🚀 2. Fetch Activity safely (If backend blocks guests, it catches cleanly without breaking the page)
         try {
-          const actRes = await api.get('/users/activity', { params: { userId: userId } });
+          const actRes = await api.get(`/users/activity?userId=${userId}`);
           setActivity(actRes.data?.data || []);
           if (actRes.data?.totalPoints !== undefined) {
              setTotalPoints(actRes.data.totalPoints);

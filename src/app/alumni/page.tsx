@@ -60,14 +60,17 @@ export default function AlumniPage() {
       try {
         const userRes = await api.get('/users/me');
         setCurrentUser(userRes.data?.data || userRes.data?.user || userRes.data);
-      } catch (e) {
-        router.push('/login');
+      } catch (e: any) {
+        // 🚀 THE FIX: Only redirect on a hard 401 Unauthorized
+        if (e.response && e.response.status === 401) {
+          router.push('/login');
+        }
       }
       fetchAlumni();
     };
     init();
   }, [router]);
-
+  
   // 🚀 NEW: Reset visible count when filters change
   useEffect(() => {
     setVisibleCount(12);

@@ -1,18 +1,15 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://iba-hub-backend.onrender.com/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
-  // Note: withCredentials: true is no longer strictly required for Bearer tokens,
-  // but it doesn't hurt to leave it if other endpoints rely on it.
-  withCredentials: true, 
+  withCredentials: true,
 });
 
-// 🚀 NEW: Automatically attach the token to every request
+// 1. Interceptor (This must run before any request is made)
 api.interceptors.request.use((config) => {
-  // Safety check for Next.js SSR
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
     if (token) {
@@ -20,12 +17,13 @@ api.interceptors.request.use((config) => {
     }
   }
   return config;
-});
+}, (error) => Promise.reject(error));
 
-// 🚀 PROMISE DEDUPLICATOR (Kept perfectly intact!)
+// 2. Promise Deduplicator (Modified to respect the interceptor)
 const pendingRequests = new Map();
-const originalGet = api.get;
 
+// We override the api.get method directly on the instance
+const originalGet = api.get;
 api.get = async (url: string, config?: any) => {
   const queryString = config?.params ? JSON.stringify(config.params) : '';
   const key = `${url}-${queryString}`;
@@ -34,6 +32,7 @@ api.get = async (url: string, config?: any) => {
     return pendingRequests.get(key);
   }
 
+  // Calling 'api.get' inside here now correctly triggers the interceptor
   const promise = originalGet(url, config).finally(() => {
     setTimeout(() => pendingRequests.delete(key), 2000);
   });

@@ -128,18 +128,24 @@ function ConnectEngine() {
     
     const initializeChat = async () => {
       try {
-        const userRes = await api.get('/users/me', {
-          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache', 'Expires': '0' }
-        });
+        // 🚀 FIX 1: Use a clean GET request without custom caching headers
+        const userRes = await api.get('/users/me');
+        
         const user = userRes.data?.data || userRes.data?.user || userRes.data;
         if (user?._id) {
           setCurrentUser(user);
           socketRef.current?.emit('setup_user', user._id);
           socketRef.current?.on('connect', () => socketRef.current?.emit('setup_user', user._id));
         }
-      } catch (error) { 
-        console.error("Authentication failed. Redirecting to login...");
-        router.push('/login'); 
+      } catch (error: any) { 
+        // 🚀 FIX 2: Only redirect if the backend explicitly says "Unauthorized"
+        if (error.response && error.response.status === 401) {
+          console.error("Chat Auth: Unauthorized. Redirecting to login...");
+          router.push('/login'); 
+        } else {
+          // Ignore CORS or temporary network hiccups
+          console.warn("Chat Auth: Network error ignored, keeping session alive.");
+        }
       }
     };
 

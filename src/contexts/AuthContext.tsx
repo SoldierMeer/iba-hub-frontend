@@ -33,36 +33,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      // 🚀 ONLY show the loading screen if we don't already have a user.
-      if (!user) {
-        setIsLoading(true); 
-      }
-      
-      try {
-        const res = await api.get('/users/me');
-        setUser(res.data?.data || res.data?.user || res.data);
-        setIsAuthenticated(true);
-      } catch (error) {
-        // If the token is invalid or missing, clear everything
-        setUser(null);
-        setIsAuthenticated(false);
-        if (typeof window !== 'undefined') {
-            // localStorage.removeItem('token');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    // Don't fetch on auth pages
-    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname === '/register')) {
+    // 1. Identify if we are on an auth page (using the pathname variable)
+    const isAuthPage = pathname === '/login' || pathname === '/register';
+
+    if (isAuthPage) {
         setIsLoading(false);
         return;
     }
-    
+
+    const fetchUser = async () => {
+        // Only trigger loading state if we don't have user data yet
+        if (!user) setIsLoading(true);
+
+        try {
+            const res = await api.get('/users/me');
+            setUser(res.data?.data || res.data?.user || res.data);
+            setIsAuthenticated(true);
+        } catch (error: any) {
+            // Check the status code. If it doesn't exist, it's likely a network/CORS error
+            const status = error.response?.status;
+
+            if (status === 401) {
+                // 🚀 ONLY logout if the server says we are unauthorized
+                console.warn("Auth check: 401 Unauthorized, clearing session.");
+                setUser(null);
+                setIsAuthenticated(false);
+                if (typeof window !== 'undefined') {
+                    // localStorage.removeItem('token'); 
+                }
+            } else {
+                // 🚀 IGNORE CORS errors, 500 errors, or network hiccups
+                // Keep the user logged in so the app doesn't flash the login screen
+                console.error("Auth check: Non-401 error (CORS/Network), keeping session alive.", error);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     fetchUser();
-  }, [pathname]);
+}, [pathname]); // pathname is the dependency
 
   // 🚀 THE MAGIC FUNCTION
   const requireAuth = (action: Function) => {

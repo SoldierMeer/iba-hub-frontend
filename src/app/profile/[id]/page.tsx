@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { 
   Camera, Edit3, Save, X, Star, BookOpen, User as UserIcon, 
   MessageSquare, AlertCircle, FileText, ArrowRight, Crop, 
-  Users, GraduationCap, Sparkles, CheckCircle2, Briefcase
+  Users, GraduationCap, Sparkles, CheckCircle2, Briefcase,
+  Hourglass, UserCheck, UserPlus
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,7 +39,6 @@ const GithubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// --- HELPER FUNCTION: HTML5 Canvas Image Cropper ---
 const createImage = (url: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
     const image = new Image();
@@ -60,6 +62,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [activity, setActivity] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState<number>(0); 
+  const [connectionStatus, setConnectionStatus] = useState<string>('none');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -89,6 +92,12 @@ export default function ProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  const params = useParams();
+  const router = useRouter();
+  const userId = params?.id as string | undefined;
+  
+  const { user: currentUser, requireAuth } = useAuth();
+
   const ensureHttps = (url: string) => {
     if (!url) return '';
     if (!/^https?:\/\//i.test(url)) return `https://${url}`;
@@ -96,17 +105,33 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
+    // Wait until Next.js has fully mounted the URL parameters
+    if (!userId) return;
+
     const fetchProfileData = async () => {
       try {
-        const [userRes, activityRes] = await Promise.all([
-          api.get('/users/me'),
-          api.get('/users/activity') 
-        ]);
-        
+        // 🚀 1. Fetch strictly the Public Profile of the target user
+        const userRes = await api.get(`/users/public/${userId}`);
         const userData = userRes.data?.data || userRes.data?.user || userRes.data;
+        
         setUser(userData);
-        setActivity(activityRes.data?.data || []);
-        setTotalPoints(activityRes.data?.totalPoints || 0); 
+        
+        // 🚀 Extract the connection status dynamically
+        setConnectionStatus(userRes.data?.connectionStatus || 'none');
+
+        // 🚀 Set the points directly from the profile document so guests always see them
+        setTotalPoints(userData.contributorPoints || 0);
+
+        // 🚀 2. Fetch Activity safely (If backend blocks guests, it catches cleanly without breaking the page)
+        try {
+          const actRes = await api.get('/users/activity', { params: { userId: userId } });
+          setActivity(actRes.data?.data || []);
+          if (actRes.data?.totalPoints !== undefined) {
+             setTotalPoints(actRes.data.totalPoints);
+          }
+        } catch (activityError) {
+          setActivity([]); // Fallback to empty if unauthorized
+        }
 
         setFormData({
           bio: userData.bio || '',
@@ -123,17 +148,40 @@ export default function ProfilePage() {
           github: userData.github || ''
         });
       } catch (error: any) {
-        if (error.response?.status === 401) {
-          window.location.href = '/login';
-        } else {
-          toast.error("Failed to load profile data.");
-        }
+        toast.error("Failed to load profile data.");
       } finally {
         setLoading(false);
       }
     };
+    
     fetchProfileData();
-  }, []);
+  }, [userId]);
+
+  const handleConnectionAction = async (action: 'send' | 'accept' | 'remove') => {
+    const loadingToast = toast.loading(`Processing request...`);
+    try {
+      let endpoint = '';
+      let method = 'POST';
+
+      if (action === 'send') endpoint = `/chat/connect/send/${user._id}`;
+      if (action === 'accept') { endpoint = `/chat/connect/accept/${user._id}`; method = 'PUT'; }
+      if (action === 'remove') { endpoint = `/chat/connect/remove/${user._id}`; method = 'DELETE'; }
+
+      // @ts-ignore
+      await api[method.toLowerCase()](endpoint);
+      
+      let successMessage = 'Action completed.';
+      let newStatus = 'none';
+      if (action === 'send') { successMessage = `Connection request sent!`; newStatus = 'pending_sent'; }
+      if (action === 'accept') { successMessage = `You are now connected!`; newStatus = 'accepted'; }
+      if (action === 'remove') { successMessage = `Connection removed.`; newStatus = 'none'; }
+
+      setConnectionStatus(newStatus);
+      toast.success(successMessage, { id: loadingToast });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || `Failed to process request.`, { id: loadingToast });
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
     const file = e.target.files?.[0];
@@ -186,11 +234,15 @@ export default function ProfilePage() {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500 font-bold tracking-widest uppercase">Loading Profile...</div>;
+  if (!user) return <div className="min-h-screen flex items-center justify-center text-slate-500 font-bold">User not found.</div>;
 
   const displayBanner = isEditing ? formData.bannerUrl : user?.bannerUrl;
   const optimizedBanner = optimizeImage(displayBanner, 1200, 400);
   const connectionCount = user?.connections?.length || 0;
   const renderedSkills = user?.skills || [];
+  
+  // 🚀 Logic to determine if user is viewing their OWN public profile
+  const isSelf = currentUser && user && String(currentUser._id) === String(user._id);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] pb-16">
@@ -262,7 +314,6 @@ export default function ProfilePage() {
                   className={`w-32 h-32 sm:w-40 sm:h-40 border-[6px] border-white shadow-xl bg-white transition-opacity ${!isEditing && user?.avatarUrl ? 'cursor-pointer hover:opacity-90' : ''}`}
                   onClick={() => { if (!isEditing && user?.avatarUrl) setViewingImage(optimizeImage(user.avatarUrl, 100, 100)); }}
                 >
-                  {/* 🚀 FIX: Dynamic Alt Text for SEO & Access */}
                   <AvatarImage alt={`${user?.firstName || 'User'}'s profile picture`} src={optimizeImage(isEditing ? formData.avatarUrl : user?.avatarUrl, 400, 400)} className="object-cover" />
                   <AvatarFallback className="bg-slate-100 text-slate-600 text-4xl font-black">{user?.firstName?.[0]}</AvatarFallback>
                 </Avatar>
@@ -275,36 +326,58 @@ export default function ProfilePage() {
               </div>
 
               {/* Action Buttons */}
+              {/* 🚀 ACTION BUTTONS - Always visible, handles Auth automatically */}
+              {/* 🚀 ACTION BUTTONS - Refined for Connection Logic */}
               <div className="flex items-center gap-3 z-10 pb-2">
-                {!isEditing ? (
-                  <Button onClick={() => setIsEditing(true)} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
-                    <Edit3 className="w-4 h-4" /> Edit Profile
-                  </Button>
+                {isSelf ? (
+                  !isEditing ? (
+                    <Button onClick={() => setIsEditing(true)} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
+                      <Edit3 className="w-4 h-4" /> Edit Profile
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button onClick={() => setIsEditing(false)} variant="outline" className="rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50">Cancel</Button>
+                      <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 font-bold shadow-md transition-all flex items-center gap-2">
+                        <Save className="w-4 h-4" /> Save Profile
+                      </Button>
+                    </div>
+                  )
                 ) : (
-                  <div className="flex gap-2">
-                    <Button onClick={() => {
-                      setIsEditing(false);
-                      setFormData({
-                        bio: user?.bio || '', 
-                        department: user?.department || '', 
-                        semester: user?.semester || '', 
-                        section: user?.section || 'A', 
-                        currentPosition: user?.currentPosition || '',
-                        about: user?.about || '', 
-                        skills: user?.skills?.join(', ') || '', 
-                        avatarUrl: user?.avatarUrl || '', 
-                        bannerUrl: user?.bannerUrl || '',
-                        linkedin: user?.linkedin || '', 
-                        instagram: user?.instagram || '',
-                        github: user?.github || '' 
-                      });
-                    }} variant="outline" className="rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50">
-                      Cancel
+                  <>
+                    {/* 1. MESSAGE BUTTON */}
+                    <Button 
+                      onClick={() => requireAuth(() => router.push(`/chat?userId=${user._id}`))}
+                      className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" /> Message
                     </Button>
-                    <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 font-bold shadow-md transition-all flex items-center gap-2">
-                      <Save className="w-4 h-4" /> Save Profile
-                    </Button>
-                  </div>
+
+                    {/* 2. CONNECTION BUTTON LOGIC */}
+                    {connectionStatus === 'accepted' ? (
+                      <Button 
+                        onClick={() => {
+                          if(window.confirm("Are you sure you want to remove this connection?")) {
+                              handleConnectionAction('remove');
+                          }
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Connected
+                      </Button>
+                    ) : connectionStatus === 'pending_sent' ? (
+                      <Button disabled className="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-6 h-11 font-bold shadow-sm flex items-center gap-2 cursor-not-allowed">
+                        <Hourglass className="w-4 h-4" /> Request Sent
+                      </Button>
+                    ) : connectionStatus === 'pending_received' ? (
+                      <Button onClick={() => requireAuth(() => handleConnectionAction('accept'))} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
+                        <UserCheck className="w-4 h-4" /> Accept Request
+                      </Button>
+                    ) : (
+                      <Button onClick={() => requireAuth(() => handleConnectionAction('send'))} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
+                        <UserPlus className="w-4 h-4" /> Connect
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -394,7 +467,6 @@ export default function ProfilePage() {
             
             {/* About Section */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-              {/* 🚀 FIX: Changed h3 to h2 for Accessibility structure */}
               <h2 className="font-black text-slate-900 text-lg flex items-center gap-2 mb-5">
                 <FileText className="w-5 h-5 text-indigo-500" /> About
               </h2>
@@ -415,14 +487,13 @@ export default function ProfilePage() {
             {/* Recent Activity */}
             {!isEditing && (
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-                {/* 🚀 FIX: Changed h3 to h2 */}
                 <h2 className="font-black text-slate-900 text-lg flex items-center gap-2 mb-6">
                   <MessageSquare className="w-5 h-5 text-blue-500" /> Recent Platform Activity
                 </h2>
                 <div className="space-y-4">
                   {activity.length === 0 ? (
                     <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                      <p className="text-slate-500 font-bold">No recent activity yet. Start contributing!</p>
+                      <p className="text-slate-500 font-bold">No recent activity yet.</p>
                     </div>
                   ) : (
                     activity.map((item) => (
@@ -446,7 +517,6 @@ export default function ProfilePage() {
                               {new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
-                          {/* 🚀 FIX: Changed h4 to h3 to maintain descending structure after h2 */}
                           <h3 className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-700 transition-colors">{item.title}</h3>
                         </div>
                         <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all mt-2.5 shrink-0" />
@@ -463,7 +533,6 @@ export default function ProfilePage() {
             
             {/* Academic Details Card */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-              {/* 🚀 FIX: Changed h3 to h2 */}
               <h2 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 mb-5">
                 <BookOpen className="w-4 h-4 text-emerald-500" /> Academic Status
               </h2>
@@ -499,7 +568,6 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1.5">Department</label>
-                    {/* 🚀 FIX: Added aria-label for accessibility */}
                     <select aria-label="Select Department" value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-[#0f172a] outline-none">
                       <option value="Computer Science">Computer Science</option>
                       <option value="Business Administration">Business Administration</option>
@@ -527,14 +595,12 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1.5">Semester</label>
-                        {/* 🚀 FIX: Added aria-label */}
                         <select aria-label="Select Semester" value={formData.semester} onChange={(e) => setFormData({...formData, semester: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-[#0f172a] outline-none">
                           {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'].map(sem => <option key={sem} value={sem}>{sem}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1.5">Section</label>
-                        {/* 🚀 FIX: Added aria-label */}
                         <select aria-label="Select Section" value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-[#0f172a] outline-none">
                           {['A','B','C','D','E','F','G','H'].map(sec => <option key={sec} value={sec}>{sec}</option>)}
                         </select>
@@ -547,7 +613,6 @@ export default function ProfilePage() {
 
             {/* Skills Card */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-              {/* 🚀 FIX: Changed h3 to h2 */}
               <h2 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 mb-5">
                 <Sparkles className="w-4 h-4 text-orange-500" /> Skills & Interests
               </h2>

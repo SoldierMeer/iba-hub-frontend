@@ -414,7 +414,7 @@ export default function HomeDashboard() {
           
           {/* Developer Credit */}
           <p className="text-[10px] sm:text-xs text-slate-500 font-medium leading-relaxed">
-            © {new Date().getFullYear()} IBA Hub. Built with 💙 by <span className="font-bold text-slate-700">Meer Muhammad</span>.
+            © {new Date().getFullYear()} IBA Hub. Built by <span className="font-bold text-slate-700">Meer Muhammad</span>.
           </p>
 
           {/* Social / Portfolio Links */}

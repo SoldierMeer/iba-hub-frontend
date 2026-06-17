@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { 
   FileText, MessageSquare, Users, AlertTriangle, BarChart2, 
   ThumbsUp, ArrowRight, BookOpen, Clock, CheckCircle2, TrendingUp, Bell,
-  GraduationCap, ExternalLink, FileArchive, Presentation, Image as ImageIcon, File, Github, Linkedin, Globe
+  GraduationCap, ExternalLink, FileArchive, Presentation, Image as ImageIcon, File, Github, Linkedin, Globe, MessageSquarePlus
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns'; 
 import { useRouter } from 'next/navigation';
@@ -402,37 +402,53 @@ export default function HomeDashboard() {
       </div>
       
       <footer className="w-full bg-white border-t border-slate-200 py-6 sm:py-8 mt-auto">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 md:gap-0 text-center md:text-left">
-          
-          {/* Logo / Brand */}
-          <div className="flex items-center justify-center md:justify-start gap-2">
-            <div className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-600 rounded-md flex items-center justify-center shadow-sm shrink-0">
-              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <p className="text-xs sm:text-sm font-black text-slate-900 font-serif tracking-tight">IBA <span className="text-indigo-600">Hub</span></p>
+      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-0 text-center md:text-left">
+        
+        {/* Logo / Brand */}
+        <div className="flex items-center justify-center md:justify-start gap-2">
+          <div className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-600 rounded-md flex items-center justify-center shadow-sm shrink-0">
+            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
           </div>
+          <p className="text-xs sm:text-sm font-black text-slate-900 font-serif tracking-tight">IBA <span className="text-indigo-600">Hub</span></p>
+        </div>
+        
+        {/* Developer Credit */}
+        <p className="text-[10px] sm:text-xs text-slate-500 font-medium leading-relaxed">
+          © {new Date().getFullYear()} IBA Hub. Built by <span className="font-bold text-slate-700">Meer Muhammad</span>.
+        </p>
+
+        {/* 🚀 Right Section: Feedback Button & Social Links */}
+        <div className="flex flex-col sm:flex-row items-center justify-center md:justify-end gap-5 sm:gap-6">
           
-          {/* Developer Credit */}
-          <p className="text-[10px] sm:text-xs text-slate-500 font-medium leading-relaxed">
-            © {new Date().getFullYear()} IBA Hub. Built by <span className="font-bold text-slate-700">Meer Muhammad</span>.
-          </p>
+          {/* Feedback Button */}
+          <a 
+            href="https://docs.google.com/forms/d/e/1FAIpQLScrKfz5gULWHWcVgTS57ywzRTvn76EXFCOtbNV18oGtKD1ogg/viewform?usp=publish-editor" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-700 text-xs font-bold rounded-full transition-all shadow-sm hover:shadow-md"
+          >
+            <MessageSquarePlus className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+            <span className="hidden sm:inline">Share Feedback</span>
+            <span className="sm:hidden">Feedback</span>
+          </a>
 
           {/* Social / Portfolio Links */}
-          <div className="flex items-center justify-center md:justify-end gap-5">
+          <div className="flex items-center gap-5">
             <a href="https://linkedin.com/in/meer-muhammad-ansari-678040178" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-[#0077b5] transition-transform hover:scale-110" title="LinkedIn">
               <Linkedin className="w-4 h-4 sm:w-5 sm:h-5" />
             </a>
             <a href="https://github.com/SoldierMeer" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-black transition-transform hover:scale-110" title="GitHub">
               <Github className="w-4 h-4 sm:w-5 sm:h-5" />
             </a>
-            {/* 🚀 Changed to Globe for Portfolio */}
             <a href="https://meer-dev.vercel.app" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-indigo-600 transition-transform hover:scale-110" title="Portfolio Website">
               <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
             </a>
           </div>
 
         </div>
-      </footer>
+
+      </div>
+    </footer>
     </div>
   );
 }

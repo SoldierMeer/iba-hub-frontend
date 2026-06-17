@@ -220,7 +220,7 @@ export default function ProfilePage() {
 
   const renderedSkills = user?.skills || [];
   const displayBanner = isEditing ? formData.bannerUrl : user?.bannerUrl;
-  const optimizedBanner = optimizeImage(displayBanner, 1200, 400);
+  const optimizedBanner = optimizeImage(displayBanner, 1200);
   
   return (
     <div className="min-h-screen bg-[#f8fafc] pb-16">
@@ -231,7 +231,7 @@ export default function ProfilePage() {
           <div className="w-full max-w-2xl bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-white/10">
             <div className="relative w-full h-[50vh] sm:h-[60vh] bg-black">
               <Cropper
-                image={cropImageSrc} crop={crop} zoom={zoom} aspect={cropType === 'avatar' ? 1 : 16 / 5}
+                image={cropImageSrc} crop={crop} zoom={zoom} aspect={cropType === 'avatar' ? 1 : 3 / 1}
                 onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom}
                 cropShape={cropType === 'avatar' ? 'round' : 'rect'} showGrid={false}
               />
@@ -270,7 +270,7 @@ export default function ProfilePage() {
         {/* === TOP HEADER CARD === */}
         <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mb-8 relative">
           <div 
-            className={`h-56 w-full relative bg-slate-200 bg-cover bg-center transition-all ${!isEditing && displayBanner ? 'cursor-pointer hover:opacity-95' : ''}`}
+            className={`w-full aspect-[3/1] max-h-[300px] relative bg-slate-200 bg-cover bg-center transition-all ${!isEditing && displayBanner ? 'cursor-pointer hover:opacity-95' : ''}`}
             style={displayBanner ? { backgroundImage: `url(${optimizedBanner})` } : { background: 'linear-gradient(to right, #0f172a, #334155)' }}
             onClick={() => { if (!isEditing && displayBanner) setViewingImage(displayBanner); }}
           >

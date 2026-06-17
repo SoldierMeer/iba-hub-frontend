@@ -90,7 +90,7 @@ export default function AlumniPage() {
 
   // 🚀 NEW: Only slice the array up to the visible count!
   const paginatedAlumni = displayedAlumni.slice(0, visibleCount);
-
+  const uniqueBatches = Array.from(new Set(alumni.map(a => a.batch).filter(Boolean))).sort().reverse();
   return (
     <>
     <ProtectedRoute>
@@ -113,7 +113,7 @@ export default function AlumniPage() {
               Alumni Network
             </h1>
             <p className="text-sm sm:text-base lg:text-lg text-slate-300 font-medium leading-relaxed mb-6 sm:mb-8 px-2 sm:px-0">
-              Connect with IBA Hub graduates worldwide. Seek mentorship, explore career paths, and build professional relationships with those who walked these halls before you.
+              Connect with IBA Hub graduates. Seek mentorship, explore career paths, and build professional relationships with those who walked these halls before you.
             </p>
             
             <div className="bg-white/10 backdrop-blur-md border border-white/20 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl flex items-center shadow-2xl w-full">
@@ -142,27 +142,28 @@ export default function AlumniPage() {
               className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl pl-3 sm:pl-4 pr-8 sm:pr-10 py-2.5 sm:py-3 outline-none focus:border-indigo-500 cursor-pointer transition-colors"
             >
               <option value="All">All Departments</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Business Administration">Business Administration</option>
-              <option value="Electrical Engineering">Electrical Engineering</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="Media & Communications">Media & Communications</option>
+              <option value="Computer Science">CS</option>
+              <option value="Business Administration">BBA</option>
+              <option value="Electrical Engineering">EE</option>
+              <option value="Computer Systems Engineering">CSE</option>
+              <option value="Mathematics">Maths</option>
+              <option value="Education">Education</option>
+              <option value="Media & Communications">Media</option>
+              <option value="Physical Education">Physical Education</option>
             </select>
             <ChevronDown className="w-4 h-4 absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
 
           <div className="w-full sm:flex-1 sm:min-w-[150px] relative">
-            <select 
+          <select 
               aria-label='batches'
               value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)}
               className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl pl-3 sm:pl-4 pr-8 sm:pr-10 py-2.5 sm:py-3 outline-none focus:border-indigo-500 cursor-pointer transition-colors"
             >
               <option value="All">All Batches</option>
-              <option value="2024">Class of 2024</option>
-              <option value="2023">Class of 2023</option>
-              <option value="2022">Class of 2022</option>
-              <option value="2021">Class of 2021</option>
-              <option value="2020">Class of 2020</option>
+              {uniqueBatches.map(batch => (
+                 <option key={batch} value={batch}>Class of {batch}</option>
+              ))}
             </select>
             <ChevronDown className="w-4 h-4 absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>

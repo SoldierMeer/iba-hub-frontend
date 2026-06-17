@@ -7,9 +7,10 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NotificationBell from '@/components/NotificationBell';
+import DeveloperModal from '@/components/DeveloperModal';
 import { 
   Search, Loader2, User as UserIcon, MessageSquare, FileText, 
-  AlertCircle, LogOut, Menu, X, Star, Users, GraduationCap, ChevronRight
+  AlertCircle, LogOut, Menu, X, Star, Users, GraduationCap, ChevronRight, Code
 } from 'lucide-react';
 
 import { optimizeImage } from '@/lib/cloudinary';
@@ -18,7 +19,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  // ✅ ADD THIS INSTEAD
   const { user, isAuthenticated } = useAuth();
   const [isPending, startTransition] = useTransition();
 
@@ -29,17 +29,18 @@ export default function Navbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // 🚀 NEW: Mobile Menu State
+  // Mobile & Modal State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDevModalOpen, setIsDevModalOpen] = useState(false);
 
-  // 🚀 Close mobile menu and dropdown automatically when route changes
+  // Close mobile menu and dropdown automatically when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setShowDropdown(false);
     setSearchQuery('');
   }, [pathname]);
 
-  // 🚀 Lock background scrolling when mobile menu is open
+  // Lock background scrolling when mobile menu is open
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -47,7 +48,7 @@ export default function Navbar() {
       document.body.style.overflow = 'unset';
     }
     return () => { document.body.style.overflow = 'unset'; };
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, isDevModalOpen]);
 
   // Global Search Debounce Logic
   useEffect(() => {
@@ -90,26 +91,19 @@ export default function Navbar() {
       await api.get('/auth/logout');
       localStorage.clear();
       sessionStorage.clear();
-
-      // 🚀 THE FIX: Destroy the Next.js Server Component cookie
       document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed, forcing clean-up:', error);
       localStorage.clear();
       sessionStorage.clear();
-
-      // 🚀 THE FIX: Ensure the cookie is destroyed even if the API call fails
       document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
       window.location.href = '/';
     }
   };
 
-  // 🚀 NEW: This prevents the 2-second freeze on page load!
   const navigateInstantly = (path: string) => {
-    setIsMobileMenuOpen(false); // Close mobile menu if open
+    setIsMobileMenuOpen(false);
     startTransition(() => {
       router.push(path);
     });
@@ -118,53 +112,52 @@ export default function Navbar() {
   const handleResultClick = (path: string) => {
     setShowDropdown(false);
     setSearchQuery('');
-    navigateInstantly(path); // 🚀 UPDATED
+    navigateInstantly(path);
   };
 
   const hasResults = searchResults.users.length > 0 || searchResults.posts.length > 0 || 
                      searchResults.resources.length > 0 || searchResults.complaints.length > 0;
 
- // Premium Desktop Nav Link
-// Revert back to standard Next.js Links to trigger loading.tsx
-const NavLink = ({ href, label }: { href: string, label: string }) => {
-  const isActive = pathname.startsWith(href);
-  return (
-    <Link 
-      href={href} 
-      onClick={() => setIsMobileMenuOpen(false)}
-      className={`relative h-full flex items-center px-3 text-sm font-bold transition-colors duration-200 ${
-        isActive ? 'text-[#0f172a]' : 'text-slate-500 hover:text-slate-800'
-      }`}
-    >
-      {label}
-      {isActive && (
-        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#0f172a] rounded-t-full shadow-[0_-2px_10px_rgba(15,23,42,0.1)] animate-in fade-in zoom-in-95 duration-300" />
-      )}
-    </Link>
-  );
-};
-
-const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: string, icon: any }) => {
-  const isActive = pathname.startsWith(href);
-  return (
-    <Link 
-      href={href} 
-      onClick={() => setIsMobileMenuOpen(false)}
-      className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold ${
-        isActive 
-          ? 'bg-[#0f172a] text-white shadow-md' 
-          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-100 shadow-sm'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+  // Premium Desktop Nav Link
+  const NavLink = ({ href, label }: { href: string, label: string }) => {
+    const isActive = pathname.startsWith(href);
+    return (
+      <Link 
+        href={href} 
+        onClick={() => setIsMobileMenuOpen(false)}
+        className={`relative h-full flex items-center px-3 text-sm font-bold transition-colors duration-200 ${
+          isActive ? 'text-[#0f172a]' : 'text-slate-500 hover:text-slate-800'
+        }`}
+      >
         {label}
-      </div>
-      <ChevronRight className={`w-4 h-4 ${isActive ? 'text-white/70' : 'text-slate-300'}`} />
-    </Link>
-  );
-};
+        {isActive && (
+          <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#0f172a] rounded-t-full shadow-[0_-2px_10px_rgba(15,23,42,0.1)] animate-in fade-in zoom-in-95 duration-300" />
+        )}
+      </Link>
+    );
+  };
 
+  // Premium Mobile Nav Link
+  const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: string, icon: any }) => {
+    const isActive = pathname.startsWith(href);
+    return (
+      <Link 
+        href={href} 
+        onClick={() => setIsMobileMenuOpen(false)}
+        className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold ${
+          isActive 
+            ? 'bg-[#0f172a] text-white shadow-md' 
+            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-100 shadow-sm'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+          {label}
+        </div>
+        <ChevronRight className={`w-4 h-4 ${isActive ? 'text-white/70' : 'text-slate-300'}`} />
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -173,7 +166,7 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
           <div className="flex justify-between h-full items-center">
             
             <div className="flex items-center gap-8 flex-1 h-full">
-              {/* LOGO - Routes to Home/Dashboard */}
+              {/* LOGO */}
               <Link href="/" className="text-2xl font-black text-[#0f172a] tracking-tight shrink-0 flex items-center h-full">
                 IBA Hub
               </Link>
@@ -262,12 +255,30 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
               <NavLink href="/forum" label="Forum" />
               <NavLink href="/leaderboard" label="Leaderboard" />
 
+              {/* 🚀 GUEST: Dev Modal right after Leaderboard */}
+              {!isAuthenticated && (
+                <button 
+                  onClick={() => setIsDevModalOpen(true)}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-slate-200 transition-colors ml-2"
+                >
+                  <Code className="w-3.5 h-3.5" />Meet The Dev
+                </button>
+              )}
+
               {isAuthenticated && (
                 <>
                   <div className="h-5 w-px bg-slate-200 mx-2" />
                   <NavLink href="/alumni" label="Alumni" />
                   <NavLink href="/chat" label={user?.isAlumni ? "Messages" : "Connect"} />
                   <NavLink href="/voice" label="Voice" />
+
+                  {/* 🚀 STUDENT: Dev Modal right after Voice */}
+                  <button 
+                    onClick={() => setIsDevModalOpen(true)}
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-slate-200 transition-colors mx-2"
+                  >
+                    <Code className="w-3.5 h-3.5" />Dev
+                  </button>
                   
                   {(user?.role === 'admin' || user?.role === 'moderator') && (
                      <NavLink href="/admin" label="Admin" />
@@ -294,6 +305,7 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
                 </>
               )}
 
+              {/* Login / Register buttons for Guests */}
               {!isAuthenticated && (
                 <div className="flex items-center h-full gap-3 ml-4">
                   <Link href="/login" className="text-sm font-bold text-slate-500 hover:text-[#0f172a] transition-colors px-2">Log In</Link>
@@ -382,7 +394,6 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
                             ))}
                           </div>
                         )}
-                        {/* Similar styling applied to other search sections for mobile */}
                         {searchResults.posts.length > 0 && (
                           <div className="mb-2">
                             <div className="px-4 py-1.5 text-[10px] font-black tracking-widest text-slate-400 uppercase bg-slate-50/50">Forum Posts</div>
@@ -394,7 +405,28 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
                             ))}
                           </div>
                         )}
-                        {/* ... Resources and Complaints styled identically ... */}
+                        {searchResults.resources.length > 0 && (
+                          <div className="mb-2">
+                            <div className="px-4 py-1.5 text-[10px] font-black tracking-widest text-slate-400 uppercase bg-slate-50/50">Resources</div>
+                            {searchResults.resources.map((r: any) => (
+                              <div key={r._id} onClick={() => handleResultClick(`/resources`)} className="px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0"><FileText className="h-4 w-4" /></div>
+                                <p className="text-sm font-bold text-slate-800 truncate">{r.title}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {searchResults.complaints.length > 0 && (
+                          <div>
+                            <div className="px-4 py-1.5 text-[10px] font-black tracking-widest text-slate-400 uppercase bg-slate-50/50">IBA Voice</div>
+                            {searchResults.complaints.map((c: any) => (
+                              <div key={c._id} onClick={() => handleResultClick(`/voice`)} className="px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0">
+                                <div className="p-2 bg-orange-50 text-orange-600 rounded-lg shrink-0"><AlertCircle className="h-4 w-4" /></div>
+                                <p className="text-sm font-bold text-slate-800 truncate">{c.title}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                    </div>
                 )}
@@ -419,6 +451,22 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
                   )}
                 </>
               )}
+
+              {/* 🚀 Mobile Dev Modal Button */}
+              <div className="h-px w-full bg-slate-200 my-4" />
+              <button 
+                onClick={() => {
+                  setIsMobileMenuOpen(false); // Close mobile drawer
+                  setIsDevModalOpen(true);    // Open modal
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl transition-all font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <Code className="w-5 h-5 text-indigo-500" />
+                  Meet the Developer
+                </div>
+                <ChevronRight className="w-4 h-4 text-indigo-300" />
+              </button>
             </div>
 
             {/* Mobile Logout / Auth Actions */}
@@ -445,6 +493,12 @@ const MobileNavLink = ({ href, label, icon: Icon }: { href: string, label: strin
           </div>
         </div>
       )}
+
+      {/* 🚀 Render Developer Modal */}
+      <DeveloperModal 
+        isOpen={isDevModalOpen} 
+        onClose={() => setIsDevModalOpen(false)} 
+      />
     </>
   );
 }

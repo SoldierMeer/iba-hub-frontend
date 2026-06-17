@@ -1,7 +1,7 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { Search, MessageSquare, Circle, Smile, Paperclip, X, CheckCircle2, BellOff, BellRing, Ban, Flag, ArrowLeft, Send } from 'lucide-react';
+import { Search, MessageSquare, Circle, Smile, Paperclip, X, CheckCircle2, BellOff, BellRing, Ban, Flag, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { User, Message } from '@/app/chat/page';
 import { optimizeImage } from '@/lib/cloudinary';
@@ -38,6 +38,7 @@ interface MessagesViewProps {
   loadMoreMessages: () => void;
   hasMoreMessages: boolean;
   isLoadingMoreMessages: boolean;
+  isSending: boolean;
   router: any;
 }
 
@@ -56,7 +57,7 @@ export default function MessagesView(props: MessagesViewProps) {
   let lastRenderedDateGroup = '';
 
   return (
-    <div className="h-[calc(100vh-130px)] md:h-[calc(100vh-180px)] min-h-[500px] flex bg-white border-y md:border border-slate-200 md:rounded-3xl shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200 -mx-4 sm:mx-0">
+    <div className="h-[calc(100vh-130px)] md:h-[calc(100vh-180px)] min-h-[500px] flex bg-white border-y md:border border-slate-200 md:rounded-3xl shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200 w-full">
       
       {/* Left Conversations Sidebar */}
       <div className={`w-full md:w-80 border-r border-slate-200 flex-col bg-[#fdfdfd] shrink-0 ${props.activeUser ? 'hidden md:flex' : 'flex'}`}>
@@ -249,7 +250,7 @@ export default function MessagesView(props: MessagesViewProps) {
               )}
               
               {props.showEmojiPicker && (
-                <div className="absolute bottom-16 sm:bottom-20 left-2 sm:left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 max-w-[95vw]">
+                <div className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 sm:left-4 sm:translate-x-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 max-w-[95vw]">
                   <EmojiPicker onEmojiClick={(e) => props.setNewMessage(prev => prev + e.emoji)} width={typeof window !== 'undefined' && window.innerWidth < 640 ? 300 : 320} height={350} />
                 </div>
               )}
@@ -268,12 +269,16 @@ export default function MessagesView(props: MessagesViewProps) {
                   onClick={() => props.setShowEmojiPicker(false)}
                 />
                 
-                <button type="button" onClick={() => props.setShowEmojiPicker(!props.showEmojiPicker)} className="p-1.5 sm:p-2 text-slate-500 hover:text-[#0f172a] hover:bg-slate-200/50 rounded-full sm:rounded-xl transition-colors shrink-0 hidden sm:block">
+                <button type="button" onClick={() => props.setShowEmojiPicker(!props.showEmojiPicker)} className="p-1.5 sm:p-2 text-slate-500 hover:text-[#0f172a] hover:bg-slate-200/50 rounded-full sm:rounded-xl transition-colors shrink-0 sm:block">
                   <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
 
-                <Button type="submit" disabled={(!props.newMessage.trim() && !props.mediaUrl)} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-full sm:rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 h-auto ml-0.5 sm:ml-1 transition-colors disabled:opacity-50 shrink-0">
-                  <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:ml-0.5" />
+                <Button type="submit" disabled={(!props.newMessage.trim() && !props.mediaUrl) || props.isSending} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-full sm:rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 h-auto ml-0.5 sm:ml-1 transition-colors disabled:opacity-50 shrink-0">
+                  {props.isSending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:ml-0.5" />
+                  )}
                 </Button>
               </form>
             </div>

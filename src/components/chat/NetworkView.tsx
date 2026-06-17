@@ -18,6 +18,8 @@ interface NetworkViewProps {
   semesterFilter: string;
   setSemesterFilter: (v: string) => void;
   showConnectionsOnly: boolean;
+  sectionFilter: string;
+  setSectionFilter: (v: string) => void;
   setShowConnectionsOnly: (v: boolean) => void;
   handleConnectionAction: (id: string, action: any, name: string) => void;
   setSelectedProfile: (user: User) => void;
@@ -27,9 +29,17 @@ interface NetworkViewProps {
 export default function NetworkView({
   currentUser, directory, displayedDirectory, suggestedConnections, statusQueueUsers,
   searchTerm, setSearchTerm, departmentFilter, setDepartmentFilter,
-  semesterFilter, setSemesterFilter, showConnectionsOnly, setShowConnectionsOnly,
+  semesterFilter, setSemesterFilter, sectionFilter, setSectionFilter, showConnectionsOnly, setShowConnectionsOnly,
   handleConnectionAction, setSelectedProfile, router
 }: NetworkViewProps) {
+
+  const DEPARTMENTS = [
+    "Computer Science", "Business Administration", "Computer Systems Engineering", 
+    "Electrical Engineering", "Mathematics", "Education", 
+    "Media & Communications", "Physical Education"
+  ];
+  const SEMESTERS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+  const SECTIONS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"];
   
   return (
     <div className="animate-in fade-in duration-300 px-4 sm:px-0 mt-6 sm:mt-0">
@@ -58,23 +68,37 @@ export default function NetworkView({
       )}
 
       {/* FILTER BAR */}
+      {/* FILTER BAR */}
       {!currentUser?.isAlumni && (
         <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4 mb-6 sm:mb-8 flex flex-col xl:flex-row items-center gap-3 sm:gap-4">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input type="text" placeholder="Search students by name..." className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-[#0f172a] focus:bg-white transition-all outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input 
+              type="text" 
+              placeholder="Search students by name..." 
+              className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-[#0f172a] focus:bg-white transition-all outline-none" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
           </div>
           
-          <div className="grid grid-cols-2 sm:flex sm:flex-row items-center gap-2 sm:gap-3 w-full xl:w-auto">
-            <select aria-label='departments' value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl px-3 sm:pl-4 sm:pr-10 py-2 sm:py-2.5 outline-none focus:border-[#0f172a] cursor-pointer">
-              <option value="All">Department</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Business Administration">Business Administration</option>
+          <div className="grid grid-cols-3 sm:flex sm:flex-row items-center gap-2 sm:gap-3 w-full xl:w-auto">
+            {/* Department Filter */}
+            <select aria-label="Department" value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-[10px] sm:text-sm font-bold rounded-lg sm:rounded-xl px-2 sm:pl-4 sm:pr-8 py-2 sm:py-2.5 outline-none focus:border-[#0f172a] cursor-pointer">
+              <option value="All">Dept</option>
+              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <select aria-label='semesters' value={semesterFilter} onChange={(e) => setSemesterFilter(e.target.value)} className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl px-3 sm:pl-4 sm:pr-10 py-2 sm:py-2.5 outline-none focus:border-[#0f172a] cursor-pointer">
-              <option value="All">Semester</option>
-              <option value="1st">1st Sem</option>
-              <option value="8th">8th Sem</option>
+            
+            {/* Semester Filter */}
+            <select aria-label="Semester" value={semesterFilter} onChange={(e) => setSemesterFilter(e.target.value)} className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-[10px] sm:text-sm font-bold rounded-lg sm:rounded-xl px-2 sm:pl-4 sm:pr-8 py-2 sm:py-2.5 outline-none focus:border-[#0f172a] cursor-pointer">
+              <option value="All">Sem</option>
+              {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+
+            {/* Section Filter */}
+            <select aria-label="Section" value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-[10px] sm:text-sm font-bold rounded-lg sm:rounded-xl px-2 sm:pl-4 sm:pr-8 py-2 sm:py-2.5 outline-none focus:border-[#0f172a] cursor-pointer">
+              <option value="All">Sec</option>
+              {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
@@ -83,7 +107,16 @@ export default function NetworkView({
               <input type="checkbox" checked={showConnectionsOnly} onChange={(e) => setShowConnectionsOnly(e.target.checked)} className="rounded text-[#0f172a] focus:ring-[#0f172a] border-slate-300 w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="text-xs sm:text-sm font-bold text-slate-700">My Connections</span>
             </label>
-            <button onClick={() => { setSearchTerm(''); setDepartmentFilter('All'); setSemesterFilter('All'); setShowConnectionsOnly(false); }} className="text-xs sm:text-sm font-bold text-slate-500 hover:text-slate-900 px-2">Clear</button>
+            <button 
+              onClick={() => { 
+                setSearchTerm(''); setDepartmentFilter('All'); 
+                setSemesterFilter('All'); setSectionFilter('All'); 
+                setShowConnectionsOnly(false); 
+              }} 
+              className="text-xs sm:text-sm font-bold text-slate-500 hover:text-slate-900 px-2"
+            >
+              Clear
+            </button>
           </div>
         </div>
       )}

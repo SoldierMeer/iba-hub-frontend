@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import { 
   Camera, Edit3, Save, X, Star, BookOpen, User as UserIcon, 
   MessageSquare, AlertCircle, FileText, ArrowRight, Crop, 
-  Users, GraduationCap, Sparkles, CheckCircle2, Briefcase, Loader2
+  Users, GraduationCap, Sparkles, CheckCircle2, Briefcase, Loader2, Globe
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -60,6 +60,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [activity, setActivity] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState<number>(0); 
+  const [connectionCount, setConnectionCount] = useState<number>(0);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,8 +72,6 @@ export default function ProfilePage() {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
-
-  
 
   const [formData, setFormData] = useState({
     bio: '',
@@ -86,7 +85,8 @@ export default function ProfilePage() {
     bannerUrl: '',
     linkedin: '', 
     instagram: '',
-    github: '' 
+    github: '' ,
+    portfolio: ''
   });
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -98,60 +98,65 @@ export default function ProfilePage() {
     return url;
   }
 
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        // 1. Fetch the user first (Sequential execution)
-        const userRes = await api.get('/users/me');
-        const userData = userRes.data?.data || userRes.data?.user || userRes.data;
-        
-        setUser(userData);
-        const userId = userData?._id;
-    
-        // 2. Only fetch activity if we successfully got a userId
-        let activityData = [];
-        let fetchedPoints = 0;
-    
-        if (userId) {
-          try {
-            const activityRes = await api.get(`/users/activity?userId=${userId}`);
-            activityData = activityRes.data?.data || [];
-            fetchedPoints = activityRes.data?.totalPoints || 0;
-          } catch (activityError) {
-            // We log it, but don't stop the whole page from loading if activity fails
-            console.error("Activity could not be loaded:", activityError);
-          }
+  // Inside ProfilePage component
+  const fetchProfileData = async () => {
+    setLoading(true);
+    try {
+      // 1. Get the current user's ID
+      const userRes = await api.get('/users/me');
+      const userData = userRes.data?.data || userRes.data?.user || userRes.data;
+      setUser(userData);
+      
+      const userId = userData?._id;
+  
+      // 2. Fetch from the rich public endpoint to get accurate stats & connections
+      let activityData = [];
+      let fetchedPoints = 0;
+      let fetchedConns = 0;
+  
+      if (userId) {
+        try {
+          const publicRes = await api.get(`/users/public/${userId}`);
+          activityData = publicRes.data?.activity || [];
+          fetchedPoints = publicRes.data?.totalPoints || 0;
+          fetchedConns = publicRes.data?.connectionCount || 0;
+        } catch (error) {
+          console.error("Stats could not be loaded:", error);
         }
-    
-        setActivity(activityData);
-        setTotalPoints(fetchedPoints);
-    
-        // 3. Set form data
-        setFormData({
-          bio: userData.bio || '',
-          department: userData.department || '',
-          semester: userData.semester || '',
-          section: userData.section || 'A',
-          currentPosition: userData.currentPosition || '', 
-          about: userData.about || '',
-          skills: userData.skills?.join(', ') || '',
-          avatarUrl: userData.avatarUrl || '',
-          bannerUrl: userData.bannerUrl || '',
-          linkedin: userData.linkedin || '',
-          instagram: userData.instagram || '',
-          github: userData.github || ''
-        });
-    
-      } catch (error: any) {
-        if (error.response?.status === 401) {
-          window.location.href = '/login';
-        } else {
-          toast.error("Failed to load profile data.");
-        }
-      } finally {
-        setLoading(false);
       }
-    };
+  
+      setActivity(activityData);
+      setTotalPoints(fetchedPoints);
+      setConnectionCount(fetchedConns); // 🚀 Ensure accurate connection count
+      
+      // 3. Set form data
+      setFormData({
+        bio: userData.bio || '',
+        department: userData.department || '',
+        semester: userData.semester || '',
+        section: userData.section || 'A',
+        currentPosition: userData.currentPosition || '', 
+        about: userData.about || '',
+        skills: userData.skills?.join(', ') || '',
+        avatarUrl: userData.avatarUrl || '',
+        bannerUrl: userData.bannerUrl || '',
+        linkedin: userData.linkedin || '',
+        instagram: userData.instagram || '',
+        github: userData.github || '',
+        portfolio: userData.portfolio || ''
+      });
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        window.location.href = '/login';
+      } else {
+        toast.error("Failed to load profile data.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchProfileData();
   }, []);
 
@@ -190,13 +195,14 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
-    setIsSaving(true); // 🚀 START LOADING
+    setIsSaving(true);
     try {
       const dataToSave = { 
         ...formData, 
         linkedin: ensureHttps(formData.linkedin),
         instagram: ensureHttps(formData.instagram),
-        github: ensureHttps(formData.github)
+        github: ensureHttps(formData.github),
+        portfolio: ensureHttps(formData.portfolio)
       };
       
       const res = await api.put('/users/profile', dataToSave);
@@ -206,13 +212,12 @@ export default function ProfilePage() {
     } catch (error) { 
       toast.error("Failed to save profile"); 
     } finally {
-      setIsSaving(false); // 🚀 STOP LOADING (runs on success or fail)
+      setIsSaving(false); 
     }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500 font-bold tracking-widest uppercase">Loading Profile...</div>;
 
-  const connectionCount = user?.connections?.length || 0;
   const renderedSkills = user?.skills || [];
   const displayBanner = isEditing ? formData.bannerUrl : user?.bannerUrl;
   const optimizedBanner = optimizeImage(displayBanner, 1200, 400);
@@ -287,7 +292,6 @@ export default function ProfilePage() {
                   className={`w-32 h-32 sm:w-40 sm:h-40 border-[6px] border-white shadow-xl bg-white transition-opacity ${!isEditing && user?.avatarUrl ? 'cursor-pointer hover:opacity-90' : ''}`}
                   onClick={() => { if (!isEditing && user?.avatarUrl) setViewingImage(optimizeImage(user.avatarUrl, 100, 100)); }}
                 >
-                  {/* 🚀 FIX: Dynamic Alt Text for SEO & Access */}
                   <AvatarImage alt={`${user?.firstName || 'User'}'s profile picture`} src={optimizeImage(isEditing ? formData.avatarUrl : user?.avatarUrl, 400, 400)} className="object-cover" />
                   <AvatarFallback className="bg-slate-100 text-slate-600 text-4xl font-black">{user?.firstName?.[0]}</AvatarFallback>
                 </Avatar>
@@ -321,7 +325,8 @@ export default function ProfilePage() {
                         bannerUrl: user?.bannerUrl || '',
                         linkedin: user?.linkedin || '', 
                         instagram: user?.instagram || '',
-                        github: user?.github || '' 
+                        github: user?.github || '' ,
+                        portfolio: user?.portfolio || ''
                       });
                     }} variant="outline" className="rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50">
                       Cancel
@@ -369,10 +374,12 @@ export default function ProfilePage() {
                         <GraduationCap className="w-4 h-4" /> {user?.department}
                       </span>
                     )}
-                    <span className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 px-3 py-1.5 rounded-lg"><Users className="w-4 h-4" /> {connectionCount} Connections</span>
+                    <span className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 px-3 py-1.5 rounded-lg">
+                      <Users className="w-4 h-4" /> {connectionCount} Connections
+                    </span>
                   </div>
 
-                  {(user?.linkedin || user?.instagram || user?.github) && (
+                  {(user?.linkedin || user?.instagram || user?.github || user?.portfolio) && (
                   <div className="flex flex-wrap items-center gap-3 mt-5 pt-5 border-t border-slate-100">
                     {user?.linkedin && (
                       <a href={ensureHttps(user.linkedin)} aria-label="LinkedIn Profile" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-[#0077b5]/10 text-[#0077b5] hover:bg-[#0077b5]/20 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow">
@@ -391,6 +398,12 @@ export default function ProfilePage() {
                     )}
                   </div>
                 )}
+                {/* Bottom Row: Portfolio Link */}
+                    {user?.portfolio && (
+                      <a href={ensureHttps(user.portfolio)} aria-label="Portfolio Website" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow w-fit mt-4">
+                        <Globe className="w-4 h-4" />Portfolio Website
+                      </a>
+                    )}
                 </div>
               ) : (
                 <div className="mt-4 space-y-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl animate-in slide-in-from-top-2 duration-200">
@@ -416,6 +429,10 @@ export default function ProfilePage() {
                       <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-2 flex items-center gap-1.5"><InstagramIcon className="w-3.5 h-3.5"/> Instagram</label>
                       <input aria-label="Instagram URL" type="url" value={formData.instagram} onChange={(e) => setFormData({...formData, instagram: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
+                    <div>
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-2 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5"/> Portfolio</label>
+                      <input aria-label="Portfolio URL" type="url" value={formData.portfolio} onChange={(e) => setFormData({...formData, portfolio: e.target.value})} placeholder="https://your-website.com" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none" />
+                    </div>
                   </div>
                 </div>
               )}
@@ -431,7 +448,6 @@ export default function ProfilePage() {
             
             {/* About Section */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-              {/* 🚀 FIX: Changed h3 to h2 for Accessibility structure */}
               <h2 className="font-black text-slate-900 text-lg flex items-center gap-2 mb-5">
                 <FileText className="w-5 h-5 text-indigo-500" /> About
               </h2>
@@ -452,7 +468,6 @@ export default function ProfilePage() {
             {/* Recent Activity */}
             {!isEditing && (
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-                {/* 🚀 FIX: Changed h3 to h2 */}
                 <h2 className="font-black text-slate-900 text-lg flex items-center gap-2 mb-6">
                   <MessageSquare className="w-5 h-5 text-blue-500" /> Recent Platform Activity
                 </h2>
@@ -483,7 +498,6 @@ export default function ProfilePage() {
                               {new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
-                          {/* 🚀 FIX: Changed h4 to h3 to maintain descending structure after h2 */}
                           <h3 className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-700 transition-colors">{item.title}</h3>
                         </div>
                         <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all mt-2.5 shrink-0" />
@@ -500,7 +514,6 @@ export default function ProfilePage() {
             
             {/* Academic Details Card */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-              {/* 🚀 FIX: Changed h3 to h2 */}
               <h2 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 mb-5">
                 <BookOpen className="w-4 h-4 text-emerald-500" /> Academic Status
               </h2>
@@ -536,7 +549,6 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1.5">Department</label>
-                    {/* 🚀 FIX: Added aria-label for accessibility */}
                     <select aria-label="Select Department" value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-[#0f172a] outline-none">
                       <option value="Computer Science">Computer Science</option>
                       <option value="Business Administration">Business Administration</option>
@@ -564,14 +576,12 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1.5">Semester</label>
-                        {/* 🚀 FIX: Added aria-label */}
                         <select aria-label="Select Semester" value={formData.semester} onChange={(e) => setFormData({...formData, semester: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-[#0f172a] outline-none">
                           {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'].map(sem => <option key={sem} value={sem}>{sem}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1.5">Section</label>
-                        {/* 🚀 FIX: Added aria-label */}
                         <select aria-label="Select Section" value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-[#0f172a] outline-none">
                           {['A','B','C','D','E','F','G','H'].map(sec => <option key={sec} value={sec}>{sec}</option>)}
                         </select>
@@ -584,7 +594,6 @@ export default function ProfilePage() {
 
             {/* Skills Card */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-              {/* 🚀 FIX: Changed h3 to h2 */}
               <h2 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 mb-5">
                 <Sparkles className="w-4 h-4 text-orange-500" /> Skills & Interests
               </h2>

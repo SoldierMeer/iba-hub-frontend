@@ -111,6 +111,7 @@ function ConnectEngine() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlUserId = searchParams.get('userId'); 
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if (viewMode === 'messages' && activeUser) {
@@ -187,24 +188,35 @@ function ConnectEngine() {
     } catch (error) { console.error('Failed to load recent conversations'); }
   };
 
-  const fetchDirectory = async () => {
-      try {
-        const res = await api.get('/chat/users', {
-          params: { 
-            search: searchTerm, 
-            department: departmentFilter !== 'All' ? departmentFilter : '',
-            section: sectionFilter !== 'All' ? sectionFilter : ''
-          },
-          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-        });
-        setDirectory(res.data.data);
-      } catch (error) { console.error('Failed to load directory'); }
-  };
+  // const fetchDirectory = async () => {
+  //     try {
+  //       const res = await api.get('/chat/users', {
+  //         params: { 
+  //           search: searchTerm, 
+  //           department: departmentFilter !== 'All' ? departmentFilter : '',
+  //           section: sectionFilter !== 'All' ? sectionFilter : ''
+  //         },
+  //         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+  //       });
+  //       setDirectory(res.data.data);
+  //     } catch (error) { console.error('Failed to load directory'); }
+  // };
 
+
+  // Fetch the FULL directory without query params so sidebars always have complete data
+  const fetchDirectory = async () => {
+    try {
+      const res = await api.get('/chat/users', {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      });
+      setDirectory(res.data.data);
+    } catch (error) { console.error('Failed to load directory'); }
+};
+
+// Only fetch once on mount. The client-side `displayedDirectory` will handle all the filtering!
   useEffect(() => {
-    const delay = setTimeout(() => fetchDirectory(), 300);
-    return () => clearTimeout(delay);
-  }, [searchTerm, departmentFilter, sectionFilter]);
+    fetchDirectory();
+  }, []);
 
   useEffect(() => {
     if (selectedProfile) {
@@ -344,12 +356,16 @@ function ConnectEngine() {
     } catch (error: any) {
         toast.error(error.response?.data?.message || `Failed to process request.`);
         fetchDirectory();
+    } finally {
+      fetchDirectory();
+      fetchConversations();
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !mediaUrl) || !activeUser || !currentUser) return;
+    setIsSending(true);
     const messageText = newMessage;
     const currentMedia = mediaUrl; 
     setNewMessage('');
@@ -368,7 +384,11 @@ function ConnectEngine() {
       if (!conversations.find(u => u._id === activeUser._id)) {
         setConversations(prev => [activeUser, ...prev]);
       }
-    } catch (error) { console.error('Failed to send message'); }
+    } catch (error) { console.error('Failed to send message'); 
+
+    } finally {
+      setIsSending(false); // 🚀 Reset loading state
+    }
   };
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -480,7 +500,9 @@ function ConnectEngine() {
     if (!matchesSearch) return false;
     if (user.isAlumni) return false; 
     if (blockedUsers.has(user._id)) return false; 
+    if (departmentFilter !== 'All' && user.department !== departmentFilter) return false;
     if (semesterFilter !== 'All' && user.semester !== semesterFilter) return false;
+    if (sectionFilter !== 'All' && user.section !== sectionFilter) return false;
     if (onlineOnly && !user.isOnline) return false;
     if (showConnectionsOnly && user.connectionStatus !== 'accepted') return false; 
     return true;
@@ -559,6 +581,8 @@ function ConnectEngine() {
             setDepartmentFilter={setDepartmentFilter}
             semesterFilter={semesterFilter}
             setSemesterFilter={setSemesterFilter}
+            sectionFilter={sectionFilter}
+            setSectionFilter={setSectionFilter}
             showConnectionsOnly={showConnectionsOnly}
             setShowConnectionsOnly={setShowConnectionsOnly}
             handleConnectionAction={handleConnectionAction}
@@ -602,6 +626,7 @@ function ConnectEngine() {
             loadMoreMessages={loadMoreMessages}
             hasMoreMessages={hasMoreMessages}
             isLoadingMoreMessages={isLoadingMoreMessages}
+            isSending={isSending}
           />
         )}
 

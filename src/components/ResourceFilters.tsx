@@ -62,9 +62,7 @@ export default function ResourceFilters() {
             <SelectContent>
               <SelectItem value="All">All Departments</SelectItem>
               <SelectItem value="Computer Science">Computer Science</SelectItem>
-              <SelectItem value="Software Engineering">Software Engineering</SelectItem>
               <SelectItem value="BBA">BBA</SelectItem>
-              <SelectItem value="Accounting & Finance">Accounting & Finance</SelectItem>
               <SelectItem value="CSE">CSE</SelectItem>
               <SelectItem value="EE">EE</SelectItem>
               <SelectItem value="Mathematics">Mathematics</SelectItem>

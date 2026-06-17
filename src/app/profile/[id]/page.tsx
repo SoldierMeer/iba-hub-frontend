@@ -8,7 +8,7 @@ import {
   Camera, Edit3, Save, X, Star, BookOpen, User as UserIcon, 
   MessageSquare, AlertCircle, FileText, ArrowRight, Crop, 
   Users, GraduationCap, Sparkles, CheckCircle2, Briefcase,
-  Hourglass, UserCheck, UserPlus
+  Hourglass, UserCheck, UserPlus, Globe
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -62,6 +62,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [activity, setActivity] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState<number>(0); 
+  const [connectionCount, setConnectionCount] = useState<number>(0);
   const [connectionStatus, setConnectionStatus] = useState<string>('none');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -86,7 +87,8 @@ export default function ProfilePage() {
     bannerUrl: '',
     linkedin: '', 
     instagram: '',
-    github: '' 
+    github: '' ,
+    portfolio: ''
   });
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -104,57 +106,53 @@ export default function ProfilePage() {
     return url;
   }
 
-  useEffect(() => {
-    // Wait until Next.js has fully mounted the URL parameters
-    if (!userId) return;
+  const fetchProfileData = async () => {
+    setLoading(true);
+    try {
+      const userRes = await api.get(`/users/public/${userId}`);
+      const userData = userRes.data?.data || userRes.data?.user || userRes.data;
+      
+      setUser(userData);
+      setConnectionStatus(userRes.data?.connectionStatus || 'none');
+      setConnectionCount(userRes.data?.connectionCount || 0);
+      
+      // 🚀 FIX: Pull totalPoints from the root of the response, not inside userData
+      setTotalPoints(userRes.data?.totalPoints || userData.contributorPoints || 0);
 
-    const fetchProfileData = async () => {
       try {
-        // 🚀 1. Fetch strictly the Public Profile of the target user
-        const userRes = await api.get(`/users/public/${userId}`);
-        const userData = userRes.data?.data || userRes.data?.user || userRes.data;
+        const actRes = await api.get(`/users/activity?userId=${userId}`);
+        setActivity(actRes.data?.data || []);
         
-        setUser(userData);
-        
-        // 🚀 Extract the connection status dynamically
-        setConnectionStatus(userRes.data?.connectionStatus || 'none');
-
-        // 🚀 Set the points directly from the profile document so guests always see them
-        setTotalPoints(userData.contributorPoints || 0);
-
-        // 🚀 2. Fetch Activity safely (If backend blocks guests, it catches cleanly without breaking the page)
-        try {
-          const actRes = await api.get(`/users/activity?userId=${userId}`);
-          setActivity(actRes.data?.data || []);
-          if (actRes.data?.totalPoints !== undefined) {
-             setTotalPoints(actRes.data.totalPoints);
-          }
-        } catch (activityError) {
-          setActivity([]); // Fallback to empty if unauthorized
+        // 🚀 FIX RESTORED: Also grab points from the activity endpoint if available
+        if (actRes.data?.totalPoints !== undefined) {
+           setTotalPoints(actRes.data.totalPoints);
         }
+      } catch (e) { setActivity([]); }
 
-        setFormData({
-          bio: userData.bio || '',
-          department: userData.department || '',
-          semester: userData.semester || '',
-          section: userData.section || 'A',
-          currentPosition: userData.currentPosition || '', 
-          about: userData.about || '',
-          skills: userData.skills?.join(', ') || '',
-          avatarUrl: userData.avatarUrl || '',
-          bannerUrl: userData.bannerUrl || '',
-          linkedin: userData.linkedin || '',
-          instagram: userData.instagram || '',
-          github: userData.github || ''
-        });
-      } catch (error: any) {
-        toast.error("Failed to load profile data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchProfileData();
+      setFormData({
+        bio: userData.bio || '',
+        department: userData.department || '',
+        semester: userData.semester || '',
+        section: userData.section || 'A',
+        currentPosition: userData.currentPosition || '', 
+        about: userData.about || '',
+        skills: userData.skills?.join(', ') || '',
+        avatarUrl: userData.avatarUrl || '',
+        bannerUrl: userData.bannerUrl || '',
+        linkedin: userData.linkedin || '',
+        instagram: userData.instagram || '',
+        github: userData.github || '',
+        portfolio: userData.portfolio || ''
+      });
+    } catch (error: any) {
+      toast.error("Failed to load profile data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) fetchProfileData();
   }, [userId]);
 
   const handleConnectionAction = async (action: 'send' | 'accept' | 'remove') => {
@@ -169,7 +167,7 @@ export default function ProfilePage() {
 
       // @ts-ignore
       await api[method.toLowerCase()](endpoint);
-      
+      await fetchProfileData(); 
       let successMessage = 'Action completed.';
       let newStatus = 'none';
       if (action === 'send') { successMessage = `Connection request sent!`; newStatus = 'pending_sent'; }
@@ -223,7 +221,8 @@ export default function ProfilePage() {
         ...formData, 
         linkedin: ensureHttps(formData.linkedin),
         instagram: ensureHttps(formData.instagram),
-        github: ensureHttps(formData.github)
+        github: ensureHttps(formData.github),
+        portfolio: ensureHttps(formData.portfolio)
       };
       
       const res = await api.put('/users/profile', dataToSave);
@@ -238,7 +237,7 @@ export default function ProfilePage() {
 
   const displayBanner = isEditing ? formData.bannerUrl : user?.bannerUrl;
   const optimizedBanner = optimizeImage(displayBanner, 1200, 400);
-  const connectionCount = user?.connections?.length || 0;
+  
   const renderedSkills = user?.skills || [];
   
   // 🚀 Logic to determine if user is viewing their OWN public profile
@@ -326,8 +325,6 @@ export default function ProfilePage() {
               </div>
 
               {/* Action Buttons */}
-              {/* 🚀 ACTION BUTTONS - Always visible, handles Auth automatically */}
-              {/* 🚀 ACTION BUTTONS - Refined for Connection Logic */}
               <div className="flex items-center gap-3 z-10 pb-2">
                 {isSelf ? (
                   !isEditing ? (
@@ -336,7 +333,24 @@ export default function ProfilePage() {
                     </Button>
                   ) : (
                     <div className="flex gap-2">
-                      <Button onClick={() => setIsEditing(false)} variant="outline" className="rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50">Cancel</Button>
+                      <Button onClick={() => {
+                        setIsEditing(false);
+                        setFormData({
+                          bio: user?.bio || '', 
+                          department: user?.department || '', 
+                          semester: user?.semester || '', 
+                          section: user?.section || 'A', 
+                          currentPosition: user?.currentPosition || '',
+                          about: user?.about || '', 
+                          skills: user?.skills?.join(', ') || '', 
+                          avatarUrl: user?.avatarUrl || '', 
+                          bannerUrl: user?.bannerUrl || '',
+                          linkedin: user?.linkedin || '', 
+                          instagram: user?.instagram || '',
+                          github: user?.github || '' ,
+                          portfolio: user?.portfolio || ''
+                        });
+                      }} variant="outline" className="rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50">Cancel</Button>
                       <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 font-bold shadow-md transition-all flex items-center gap-2">
                         <Save className="w-4 h-4" /> Save Profile
                       </Button>
@@ -408,7 +422,7 @@ export default function ProfilePage() {
                     <span className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 px-3 py-1.5 rounded-lg"><Users className="w-4 h-4" /> {connectionCount} Connections</span>
                   </div>
 
-                  {(user?.linkedin || user?.instagram || user?.github) && (
+                  {(user?.linkedin || user?.instagram || user?.github || user?.portfolio) && (
                   <div className="flex flex-wrap items-center gap-3 mt-5 pt-5 border-t border-slate-100">
                     {user?.linkedin && (
                       <a href={ensureHttps(user.linkedin)} aria-label="LinkedIn Profile" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-[#0077b5]/10 text-[#0077b5] hover:bg-[#0077b5]/20 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow">
@@ -427,6 +441,12 @@ export default function ProfilePage() {
                     )}
                   </div>
                 )}
+                {/* Bottom Row: Portfolio Link */}
+                    {user?.portfolio && (
+                      <a href={ensureHttps(user.portfolio)} aria-label="Portfolio Website" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow w-fit">
+                        <Globe className="w-4 h-4" /> Personal Portfolio Website
+                      </a>
+                    )}
                 </div>
               ) : (
                 <div className="mt-4 space-y-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl animate-in slide-in-from-top-2 duration-200">
@@ -439,7 +459,7 @@ export default function ProfilePage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-200/60 pt-4 mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200/60 pt-4 mt-2">
                     <div>
                       <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-2 flex items-center gap-1.5"><LinkedinIcon className="w-3.5 h-3.5"/> LinkedIn</label>
                       <input aria-label="LinkedIn URL" type="url" value={formData.linkedin} onChange={(e) => setFormData({...formData, linkedin: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none" />
@@ -451,6 +471,10 @@ export default function ProfilePage() {
                     <div>
                       <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-2 flex items-center gap-1.5"><InstagramIcon className="w-3.5 h-3.5"/> Instagram</label>
                       <input aria-label="Instagram URL" type="url" value={formData.instagram} onChange={(e) => setFormData({...formData, instagram: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-2 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5"/> Portfolio</label>
+                      <input aria-label="Portfolio URL" type="url" value={formData.portfolio} onChange={(e) => setFormData({...formData, portfolio: e.target.value})} placeholder="https://your-website.com" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                   </div>
                 </div>
@@ -493,7 +517,7 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   {activity.length === 0 ? (
                     <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                      <p className="text-slate-500 font-bold">No recent activity yet.</p>
+                      <p className="text-slate-500 font-bold">No recent activity yet. Start contributing!</p>
                     </div>
                   ) : (
                     activity.map((item) => (

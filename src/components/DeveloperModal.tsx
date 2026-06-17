@@ -37,7 +37,7 @@ export default function DeveloperModal({ isOpen, onClose }: DeveloperModalProps)
           <div className="px-6 sm:px-8 pb-8 relative text-center">
             
             {/* Profile Image - No longer clipped! */}
-            <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto -mt-12 mb-4 rounded-full border-4 border-white shadow-lg bg-white relative shrink-0 z-10">
+            <div className="w-28 h-28 sm:w-32 sm:h-32 mx-auto -mt-14 sm:-mt-16 mb-4 rounded-full border-[5px] border-white shadow-xl bg-slate-50 relative shrink-0 z-10 overflow-hidden">
               <Image 
                 src="/meer-profile1.png" 
                 alt="Meer Muhammad" 
@@ -45,7 +45,8 @@ export default function DeveloperModal({ isOpen, onClose }: DeveloperModalProps)
                 height={400}
                 quality={100} 
                 priority 
-                className="w-full h-full object-cover object-top rounded-full" 
+                // 🚀 CHANGED: Aggressive 170% zoom and pushed down slightly
+                className="w-full h-full object-cover object-top scale-[1.5] translate-y-6" 
               />
             </div>
             

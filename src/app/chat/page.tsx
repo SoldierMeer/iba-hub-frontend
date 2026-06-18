@@ -129,9 +129,7 @@ function ConnectEngine() {
     
     const initializeChat = async () => {
       try {
-        // 🚀 FIX 1: Use a clean GET request without custom caching headers
         const userRes = await api.get('/users/me');
-        
         const user = userRes.data?.data || userRes.data?.user || userRes.data;
         if (user?._id) {
           setCurrentUser(user);
@@ -139,25 +137,25 @@ function ConnectEngine() {
           socketRef.current?.on('connect', () => socketRef.current?.emit('setup_user', user._id));
         }
       } catch (error: any) { 
-        // 🚀 FIX 2: Only redirect if the backend explicitly says "Unauthorized"
         if (error.response && error.response.status === 401) {
           console.error("Chat Auth: Unauthorized. Redirecting to login...");
           router.push('/login'); 
         } else {
-          // Ignore CORS or temporary network hiccups
           console.warn("Chat Auth: Network error ignored, keeping session alive.");
         }
       }
     };
-
+  
     initializeChat();
     fetchConversations();
-
+  
+    // --- SOCKET LISTENERS ---
+  
     socketRef.current.on('receive_message', (incomingMessage: Message) => {
       if (blockedUsers.has(incomingMessage.sender)) return;
-
+  
       if (activeUserRef.current?._id === incomingMessage.sender) {
-        shouldScrollToBottom.current = true; // 🚀 Auto-scroll for new messages
+        shouldScrollToBottom.current = true;
         setMessages((prev) => [...prev, incomingMessage]);
       } else {
         setUnreadSenders((prev) => {
@@ -167,18 +165,33 @@ function ConnectEngine() {
         });
       }
     });
-
+  
+    // 🚀 NEW: Update status when someone goes online/offline
+    socketRef.current.on('user_status_change', ({ userId, isOnline }: { userId: string, isOnline: boolean }) => {
+      // 1. Update Directory list
+      setDirectory((prev) => prev.map(u => u._id === userId ? { ...u, isOnline } : u));
+      
+      // 2. Update Conversations list
+      setConversations((prev) => prev.map(u => u._id === userId ? { ...u, isOnline } : u));
+      
+      // 3. Update the currently active user if they are the one changing status
+      setActiveUser((prev) => (prev && prev._id === userId) ? { ...prev, isOnline } : prev);
+    });
+  
     socketRef.current.on('new_notification', (notif: any) => {
       if (notif.type === 'connection') {
         fetchDirectory();
         fetchConversations();
       }
     });
-
+  
     socketRef.current.on('typing', () => setIsTyping(true));
     socketRef.current.on('stop_typing', () => setIsTyping(false));
-    return () => { socketRef.current?.disconnect(); };
-  }, [blockedUsers, router]);
+  
+    return () => { 
+      socketRef.current?.disconnect(); 
+    };
+  }, [blockedUsers, router, setCurrentUser]); // Added setCurrentUser to dependencies for stability
 
 
   const fetchConversations = async () => {
@@ -511,7 +524,7 @@ function ConnectEngine() {
   const sidebarMap = new Map<string, User>();
   conversations.forEach(u => sidebarMap.set(u._id, u));
   directory.forEach(u => {
-    if (u.connectionStatus === 'accepted' || unreadSenders.has(u._id) || activeUser?._id === u._id) {
+    if (unreadSenders.has(u._id) || activeUser?._id === u._id) {
       sidebarMap.set(u._id, u);
     }
   });
@@ -588,6 +601,7 @@ function ConnectEngine() {
             handleConnectionAction={handleConnectionAction}
             setSelectedProfile={setSelectedProfile}
             router={router}
+            handleUserSelect={handleUserSelect}
           />
         )}
 

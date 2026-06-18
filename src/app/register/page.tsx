@@ -43,7 +43,7 @@ export default function RegisterPage() {
     e.preventDefault();
     
     // 🚀 New Regex Pattern for student emails
-    const studentEmailRegex = /^[a-zA-Z0-9]+\.(b|m)(f|s)[a-z]+\d{2}@iba-suk\.edu\.pk$/i;
+    const studentEmailRegex = /^[a-zA-Z0-9_.-]+\.[a-z]+(f|s)\d{2,3}[a-z]*@iba-suk\.edu\.pk$/i;
     
     if (!studentEmailRegex.test(formData.email)) {
       return toast.error('Invalid student email format. Please check your credentials.');

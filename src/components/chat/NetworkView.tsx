@@ -1,7 +1,8 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { Search, Users, GraduationCap, UserCheck, Hourglass, UserPlus, Star, ArrowRight } from 'lucide-react';
+// 🚀 ADDED: MessageSquare icon import
+import { Search, Users, GraduationCap, UserCheck, Hourglass, UserPlus, Star, ArrowRight, MessageSquare } from 'lucide-react';
 import { User } from '@/app/chat/page';
 import { optimizeImage } from '@/lib/cloudinary';
 
@@ -24,13 +25,15 @@ interface NetworkViewProps {
   handleConnectionAction: (id: string, action: any, name: string) => void;
   setSelectedProfile: (user: User) => void;
   router: any;
+  // 🚀 ADDED THIS PROP
+  handleUserSelect: (user: User) => void; 
 }
 
 export default function NetworkView({
   currentUser, directory, displayedDirectory, suggestedConnections, statusQueueUsers,
   searchTerm, setSearchTerm, departmentFilter, setDepartmentFilter,
   semesterFilter, setSemesterFilter, sectionFilter, setSectionFilter, showConnectionsOnly, setShowConnectionsOnly,
-  handleConnectionAction, setSelectedProfile, router
+  handleConnectionAction, setSelectedProfile, router, handleUserSelect // 🚀 DESTRUCTURED HERE
 }: NetworkViewProps) {
 
   const DEPARTMENTS = [
@@ -67,7 +70,6 @@ export default function NetworkView({
         </div>
       )}
 
-      {/* FILTER BAR */}
       {/* FILTER BAR */}
       {!currentUser?.isAlumni && (
         <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4 mb-6 sm:mb-8 flex flex-col xl:flex-row items-center gap-3 sm:gap-4">
@@ -216,8 +218,12 @@ export default function NetworkView({
 
                   <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-auto">
                     {connectionButton}
-                    <button onClick={() => setSelectedProfile(user)} className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] sm:text-xs font-bold rounded-lg transition-colors shadow-sm">
-                      View Profile
+                    {/* 🚀 FIXED: Swapped View Profile for direct Message Button */}
+                    <button 
+                      onClick={() => handleUserSelect(user)} 
+                      className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] sm:text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Message
                     </button>
                   </div>
                 </div>

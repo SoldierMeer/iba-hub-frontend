@@ -51,7 +51,7 @@ export default function RegisterPage() {
   
     setIsLoading(true);
     try {
-      await api.post('/auth/send-otp', { email: formData.email });
+      await api.post('/auth/send-otp', { email: formData.email, isAlumni: formData.isAlumni });
       toast.success('Verification code sent!');
       setStep(2);
     } catch (error: any) {

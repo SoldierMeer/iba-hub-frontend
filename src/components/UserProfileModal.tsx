@@ -161,15 +161,30 @@ export default function UserProfileModal({ isOpen, onClose, userId }: UserProfil
                   <div className="bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100 flex items-start gap-2 sm:gap-3">
                     <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{profile.isAlumni ? 'Current Role' : 'Department'}</p>
-                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 leading-snug truncate">{profile.currentPosition || profile.department || 'Not specified'}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        {profile.isAlumni ? 'Current Role' : 'Department'}
+                      </p>
+                      {/* 🚀 FIXED: Value now strictly matches the label based on isAlumni */}
+                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 leading-snug truncate">
+                        {profile.isAlumni 
+                          ? (profile.currentPosition || 'Not specified') 
+                          : (profile.department || 'Not specified')}
+                      </p>
                     </div>
                   </div>
+                  
                   <div className="bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100 flex items-start gap-2 sm:gap-3">
                     <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{profile.isAlumni ? 'Class Of' : 'Semester'}</p>
-                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 leading-snug truncate">{profile.batch || profile.semester || 'Not specified'}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        {profile.isAlumni ? 'Class Of' : 'Semester'}
+                      </p>
+                      {/* 🚀 FIXED: Value now strictly matches the label based on isAlumni */}
+                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 leading-snug truncate">
+                        {profile.isAlumni 
+                          ? (profile.batch || 'Not specified') 
+                          : (profile.semester || 'Not specified')}
+                      </p>
                     </div>
                   </div>
                 </div>

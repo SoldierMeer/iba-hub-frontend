@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import api from '@/lib/api'; 
 import { Button } from "@/components/ui/button";
@@ -21,45 +20,100 @@ export default function ResourceCard({ resource }: { resource: any }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   
-  const isLink = resource.fileType?.toLowerCase() === 'link';
-  const isZip = resource.fileType?.toLowerCase() === 'zip';
-  const isPPT = resource.fileType?.toLowerCase() === 'ppt';
-  const isTxt = resource.fileType?.toLowerCase() === 'txt';
+  // 🚀 Normalized File Types
+  const fileTypeStr = (resource.fileType || 'document').toLowerCase();
+  const isLink = fileTypeStr === 'link';
+  const isZip = fileTypeStr === 'zip';
+  const isPPT = fileTypeStr === 'ppt';
+  const isTxt = fileTypeStr === 'txt';
+  const isPdf = fileTypeStr === 'pdf';
+  const isDoc = fileTypeStr === 'document' || fileTypeStr === 'doc' || fileTypeStr === 'docx';
+  const isImage = fileTypeStr === 'image' || fileTypeStr.includes('image');
+
+  // 🚀 Safe URL Formatter
+  const getValidUrl = (url: string) => {
+    if (!url) return '';
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return `https://${url}`;
+    }
+    return url;
+  };
+
+  const fixedUrl = getValidUrl(resource.fileUrl);
+
+  // 🚀 SMART PREVIEW ROUTER
+  const getPreviewUrl = () => {
+    if (!fixedUrl) return '';
+    const isGoogleDrive = fixedUrl.includes('drive.google.com');
+
+    if (isImage || isTxt) {
+      return fixedUrl; 
+    } else if (isGoogleDrive) {
+      return fixedUrl.replace(/\/view.*$/, '/preview'); 
+    } else if (isPPT) {
+      return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixedUrl)}`; 
+    } else {
+      return `https://docs.google.com/viewer?url=${encodeURIComponent(fixedUrl)}&embedded=true`; 
+    }
+  };
+
+  const previewUrl = getPreviewUrl();
 
   const handleDownload = async () => {
-    setIsDownloading(true);
-    const loadingToast = toast.loading('Opening resource...');
+    if (!fixedUrl) return toast.error("Resource URL is missing!");
     
+    setIsDownloading(true);
+
     try {
-      try {
-        await api.put(`/resources/${resource._id}/download`);
-          setDownloads((prev: number) => prev + 1);
-      } catch (countError) {
-        console.warn("Failed to update download counter.", countError);
-      }
+      // 1. Update counter in the background
+      api.put(`/resources/${resource._id}/download`)
+        .then(() => setDownloads((prev: number) => prev + 1))
+        .catch((err) => console.warn("Counter update failed", err));
 
-      if (isLink) {
-        window.open(resource.fileUrl, '_blank');
-        toast.dismiss(loadingToast);
-        setIsDownloading(false);
-        return;
-      }
-
-      const response = await axios.get(resource.fileUrl, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      // 2. 🚀 THE BLOB FETCH METHOD (Perfect Filenames & Formats)
+      // We use vanilla fetch without JWT headers so Cloudinary allows the cross-origin request
+      const response = await fetch(fixedUrl);
+      if (!response.ok) throw new Error("Network fetch failed");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
       const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', resource.fileName || 'iba_resource');
+      link.href = blobUrl;
+      
+      // 🚀 Force the exact original filename and extension!
+      link.setAttribute('download', resource.fileName || `iba_hub_resource.${resource.fileType || 'pdf'}`);
+      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('Download complete!', { id: loadingToast });
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success('Download complete!');
     } catch (error) {
-      console.error("Download failed:", error);
-      toast.error('Opening in new tab instead...', { id: loadingToast });
-      window.open(resource.fileUrl, '_blank'); 
+      console.error("Blob download failed, falling back:", error);
+      
+      // 🚀 FALLBACK: If strict browsers block the fetch, fallback to Cloudinary URL
+      let fallbackUrl = fixedUrl;
+      const isCloudinary = fallbackUrl.includes('cloudinary.com');
+      const isRawFile = fallbackUrl.includes('/raw/upload/');
+      
+      if (isCloudinary && !isRawFile && !fallbackUrl.includes('fl_attachment')) {
+        // Strip the extension from the name to prevent Cloudinary 400 Errors
+        const nameWithoutExt = (resource.fileName || 'document').replace(/\.[^/.]+$/, "");
+        const safeName = encodeURIComponent(nameWithoutExt.replace(/[^a-zA-Z0-9_\-]/g, '_'));
+        fallbackUrl = fallbackUrl.replace('/upload/', `/upload/fl_attachment:${safeName}/`);
+      }
+
+      const link = document.createElement('a');
+      link.href = fallbackUrl;
+      link.target = '_blank';
+      link.download = resource.fileName || 'document';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Download started!');
     } finally {
       setIsDownloading(false);
     }
@@ -135,7 +189,6 @@ export default function ResourceCard({ resource }: { resource: any }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Share Button (Icon only) */}
             <Button 
               aria-label="Share Resource"
               variant="outline" 
@@ -147,8 +200,7 @@ export default function ResourceCard({ resource }: { resource: any }) {
               <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
 
-            {/* 🚀 REFACTORED: Preview Button (Icon only) */}
-            {(!isLink && !isZip && !isPPT && !isTxt) && (
+            {(!isLink && !isZip && !isTxt && !isPPT) && (
               <Button 
                 aria-label="Preview Button"
                 variant="outline"
@@ -161,21 +213,38 @@ export default function ResourceCard({ resource }: { resource: any }) {
               </Button>
             )}
 
-            {/* Download Button (Takes all remaining space) */}
-            <Button 
-              aria-label="Download Resource"
-              onClick={handleDownload} 
-              disabled={isDownloading}
-              className="flex-1 rounded-xl h-9 sm:h-10 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-semibold transition-colors text-xs sm:text-sm px-2 overflow-hidden"
-            >
-              {isDownloading ? '...' : (
-                <div className="flex items-center justify-center gap-1.5">
-                  {isLink ? <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" /> : <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />}
-                  <span className="hidden sm:inline whitespace-nowrap truncate">{isLink ? 'Open Link' : isPPT ? 'Download PPT' : isZip ? 'Download ZIP' : 'Download'}</span>
-                  <span className="sm:hidden">Save</span>
-                </div>
-              )}
-            </Button>
+            {isLink ? (
+              <a 
+                href={fixedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  api.put(`/resources/${resource._id}/download`)
+                     .then(() => setDownloads(prev => prev + 1)).catch(() => {});
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl h-9 sm:h-10 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-semibold transition-colors text-xs sm:text-sm px-2 overflow-hidden"
+              >
+                <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline whitespace-nowrap truncate">Open Link</span>
+                <span className="sm:hidden">Open</span>
+              </a>
+            ) : (
+              <Button 
+                aria-label="Download Resource"
+                onClick={handleDownload} 
+                disabled={isDownloading}
+                className="flex-1 rounded-xl h-9 sm:h-10 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-semibold transition-colors text-xs sm:text-sm px-2 overflow-hidden"
+              >
+                {isDownloading ? '...' : (
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                    <span className="hidden sm:inline whitespace-nowrap truncate">{isPPT ? 'Download PPT' : isZip ? 'Download ZIP' : 'Download'}</span>
+                    <span className="sm:hidden">Save</span>
+                  </div>
+                )}
+              </Button>
+            )}
+
           </div>
         </div>
       </div>
@@ -190,7 +259,7 @@ export default function ResourceCard({ resource }: { resource: any }) {
                 </div>
                 <div className="truncate flex-1 min-w-0">
                   <h3 className="text-sm sm:text-base font-black leading-none truncate">{resource.title}</h3>
-                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 mt-0.5 sm:mt-1 truncate">{resource.fileName}</p>
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 mt-0.5 sm:mt-1 truncate">{resource.fileName || 'document'}</p>
                 </div>
               </div>
               <button 
@@ -204,14 +273,16 @@ export default function ResourceCard({ resource }: { resource: any }) {
           </DialogHeader>
 
           <div className="flex-1 bg-slate-100 relative">
-            {resource.fileType?.toLowerCase().includes('image') ? (
+            {isImage ? (
               <div className="w-full h-full flex items-center justify-center p-2 sm:p-6">
-                <img src={resource.fileUrl} alt={resource.title} className="max-w-full max-h-full object-contain rounded-lg sm:rounded-xl shadow-sm" />
+                <img src={fixedUrl} alt={resource.title} className="max-w-full max-h-full object-contain rounded-lg sm:rounded-xl shadow-sm" />
               </div>
-            ) : isPPT ? (
-              <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(resource.fileUrl || '')}`} className="w-full h-full border-0" title="PowerPoint Preview" />
+            ) : isPdf ? (
+              <object data={fixedUrl} type="application/pdf" className="w-full h-full">
+                <iframe src={previewUrl} className="w-full h-full border-0" title="PDF Preview Fallback" />
+              </object>
             ) : (
-              <iframe src={`https://docs.google.com/viewer?url=${encodeURIComponent(resource.fileUrl || '')}&embedded=true`} className="w-full h-full border-0" title="Document Preview" />
+              <iframe src={previewUrl} className="w-full h-full border-0" title="Resource Preview" />
             )}
           </div>
         </DialogContent>

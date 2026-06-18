@@ -220,7 +220,7 @@ export default function ResourceCard({ resource }: { resource: any }) {
                 rel="noopener noreferrer"
                 onClick={() => {
                   api.put(`/resources/${resource._id}/download`)
-                     .then(() => setDownloads(prev => prev + 1)).catch(() => {});
+                     .then(() => setDownloads((prev: number) => prev + 1)).catch(() => {});
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-xl h-9 sm:h-10 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-semibold transition-colors text-xs sm:text-sm px-2 overflow-hidden"
               >

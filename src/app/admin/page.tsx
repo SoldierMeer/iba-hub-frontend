@@ -365,10 +365,35 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     
-                    <div className="bg-slate-50 p-3 rounded-xl mb-4 text-xs space-y-2 flex-1 border border-slate-100">
-                      <p className="flex justify-between"><span className="text-slate-500 font-medium">Author:</span> <span className="font-bold text-slate-700">{complaint.isAnonymous ? 'Anonymous' : `${complaint.author?.firstName} ${complaint.author?.lastName}`}</span></p>
-                      <p className="flex justify-between"><span className="text-slate-500 font-medium">Date:</span> <span className="font-bold text-slate-700">{new Date(complaint.createdAt).toLocaleDateString()}</span></p>
+                    <div className="bg-slate-50 p-3 rounded-xl mb-4 text-xs space-y-2 flex-1 border border-slate-100 flex flex-col">
+                      <p className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">Author:</span> 
+                        <span 
+                          className={`font-bold text-slate-700 ${!complaint.isAnonymous ? 'cursor-pointer hover:text-indigo-600 hover:underline transition-colors' : ''}`}
+                          onClick={() => !complaint.isAnonymous && setSelectedUserId(complaint.author?._id)}
+                        >
+                          {complaint.isAnonymous ? 'Anonymous' : `${complaint.author?.firstName} ${complaint.author?.lastName}`}
+                        </span>
+                      </p>
+                      <p className="flex justify-between items-center"><span className="text-slate-500 font-medium">Date:</span> <span className="font-bold text-slate-700">{new Date(complaint.createdAt).toLocaleDateString()}</span></p>
                       <div className="pt-2 mt-2 border-t border-slate-200 text-slate-600 font-medium line-clamp-4 leading-relaxed bg-white p-2 rounded-lg italic">"{complaint.description}"</div>
+                      
+                      {/* 🚀 ADDED: Evidence Image Button for Admins */}
+                      {complaint.mediaUrl && (
+                        <div className="pt-3 mt-auto border-t border-slate-200 border-dashed">
+                          <button 
+                            onClick={() => handlePreview({
+                              fileType: 'image',
+                              fileUrl: optimizeImage(complaint.mediaUrl, 1200, 1200),
+                              title: `Evidence for: ${complaint.title}`,
+                              fileName: 'attached_evidence.jpg'
+                            })}
+                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors border border-indigo-100 w-max shadow-sm"
+                          >
+                            <ImageIcon className="w-3.5 h-3.5" /> View Attached Evidence
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -409,8 +434,16 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="bg-slate-50 p-3 rounded-xl mb-4 text-xs space-y-2 flex-1 border border-slate-100">
-                      <p className="flex justify-between"><span className="text-slate-500 font-medium">Uploader:</span> <span className="font-bold text-slate-700">{resource.uploader?.firstName} {resource.uploader?.lastName}</span></p>
-                      <p className="flex justify-between"><span className="text-slate-500 font-medium">Format:</span> <span className="font-bold text-slate-700 uppercase">{resource.fileType}</span></p>
+                      <p className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">Uploader:</span> 
+                        <span 
+                          className="font-bold text-slate-700 cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
+                          onClick={() => setSelectedUserId(resource.uploader?._id)}
+                        >
+                          {resource.uploader?.firstName} {resource.uploader?.lastName}
+                        </span>
+                      </p>
+                      <p className="flex justify-between items-center"><span className="text-slate-500 font-medium">Format:</span> <span className="font-bold text-slate-700 uppercase">{resource.fileType}</span></p>
                       <p className="flex justify-between"><span className="text-slate-500 font-medium">Size:</span> <span className="font-bold text-slate-700">{resource.fileSize}</span></p>
                       <div className="pt-2 mt-2 border-t border-slate-200 text-slate-600 italic line-clamp-2 leading-relaxed">"{resource.description}"</div>
                     </div>
@@ -483,7 +516,12 @@ export default function AdminDashboard() {
                         <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">{complaint.category || 'General'}</p>
                       </td>
                       <td className="p-4 text-xs sm:text-sm font-medium text-slate-700 whitespace-nowrap">
-                        {complaint.isAnonymous ? 'Anonymous' : `${complaint.author?.firstName} ${complaint.author?.lastName}`}
+                        <span 
+                          className={`${!complaint.isAnonymous ? 'cursor-pointer hover:text-indigo-600 hover:underline transition-colors' : ''}`}
+                          onClick={() => !complaint.isAnonymous && setSelectedUserId(complaint.author?._id)}
+                        >
+                          {complaint.isAnonymous ? 'Anonymous' : `${complaint.author?.firstName} ${complaint.author?.lastName}`}
+                        </span>
                       </td>
                       <td className="p-4 text-xs sm:text-sm text-slate-500 whitespace-nowrap">
                         {new Date(complaint.createdAt).toLocaleDateString()}
@@ -580,14 +618,20 @@ export default function AdminDashboard() {
                   filteredUsers.map((user: any) => (
                     <tr key={user._id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-4 flex items-center gap-3">
-                        <Avatar className="w-10 h-10 border border-slate-200 shadow-sm shrink-0">
+                        <Avatar 
+                          className="w-10 h-10 border border-slate-200 shadow-sm shrink-0 cursor-pointer hover:ring-2 ring-indigo-400 transition-all"
+                          onClick={() => setSelectedUserId(user._id)}
+                        >
                           <AvatarImage src={optimizeImage(user.avatarUrl, 100, 100)} />
                           <AvatarFallback className="text-[12px] font-bold bg-indigo-50 text-indigo-700">
                             {user.firstName?.[0]}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">{user.firstName} {user.lastName}</p>
+                        <div 
+                          className="min-w-0 cursor-pointer group"
+                          onClick={() => setSelectedUserId(user._id)}
+                        >
+                          <p className="text-sm font-bold text-slate-900 truncate group-hover:text-indigo-600 group-hover:underline transition-colors">{user.firstName} {user.lastName}</p>
                           <p className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate">{user.email}</p>
                         </div>
                       </td>

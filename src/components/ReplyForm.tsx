@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import toast from 'react-hot-toast'; // 🚀 Added toast
 
 export default function ReplyForm({ postId }: { postId: string }) {
   const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
-
   const { requireAuth } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,25 +17,32 @@ export default function ReplyForm({ postId }: { postId: string }) {
     if (!content.trim()) return;
     
     requireAuth(async () => {
-      setLoading(true);
+      // 🚀 1. CAPTURE DATA LOCALLY
+      const payload = content;
+
+      // 🚀 2. INSTANT UI RESET
+      setContent('');
+      toast.success("Sending reply...");
+
+      // 🚀 3. BACKGROUND FETCH
       try {
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/forum/${postId}/replies`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include', 
-          body: JSON.stringify({ content })
+          body: JSON.stringify({ content: payload })
         });
 
         if (!res.ok) throw new Error('Failed to post reply');
 
-        setContent('');
+        // 🚀 4. SILENT DATA REFRESH
         router.refresh();
         
       } catch (error) {
         console.error(error);
-        alert('Failed to post reply. Check the console for details.');
-      } finally {
-        setLoading(false);
+        toast.error('Failed to post reply. Please try again.');
+        // Optional: Revert the text box if it failed so they don't lose their typing
+        setContent(payload); 
       }
     });
   };
@@ -53,9 +59,10 @@ export default function ReplyForm({ postId }: { postId: string }) {
         required
       />
       <div className="flex justify-end">
-        <Button aria-label='reply' type="submit" disabled={loading} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 h-10 sm:h-10 rounded-lg sm:rounded-md">
+        {/* Button no longer needs 'disabled={loading}' */}
+        <Button aria-label='reply' type="submit" disabled={!content.trim()} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 h-10 sm:h-10 rounded-lg sm:rounded-md">
           <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-          {loading ? 'Posting...' : 'Post Reply'}
+          Post Reply
         </Button>
       </div>
     </form>

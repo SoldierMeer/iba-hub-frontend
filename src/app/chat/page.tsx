@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import api from '@/lib/api';
 import { io, Socket } from 'socket.io-client';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -507,19 +507,29 @@ function ConnectEngine() {
     }
   };
 
-  const displayedDirectory = directory.filter(user => {
-    const matchesSearch = `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (!matchesSearch) return false;
-    if (user.isAlumni) return false; 
-    if (blockedUsers.has(user._id)) return false; 
-    if (departmentFilter !== 'All' && user.department !== departmentFilter) return false;
-    if (semesterFilter !== 'All' && user.semester !== semesterFilter) return false;
-    if (sectionFilter !== 'All' && user.section !== sectionFilter) return false;
-    if (onlineOnly && !user.isOnline) return false;
-    if (showConnectionsOnly && user.connectionStatus !== 'accepted') return false; 
-    return true;
-  });
+  const displayedDirectory = useMemo(() => {
+    return directory.filter(user => {
+      // 🚀 ALUMNI FEATURE LOGIC: 
+      // If the current user is an Alumni, ONLY show them their accepted connections!
+      if (currentUser?.isAlumni) {
+        return user.connectionStatus === 'accepted';
+      }
+
+      // 👨‍🎓 REGULAR STUDENT LOGIC:
+      const matchesSearch = `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      if (user.isAlumni) return false; 
+      if (blockedUsers.has(user._id)) return false; 
+      if (departmentFilter !== 'All' && user.department !== departmentFilter) return false;
+      if (semesterFilter !== 'All' && user.semester !== semesterFilter) return false;
+      if (sectionFilter !== 'All' && user.section !== sectionFilter) return false;
+      if (onlineOnly && !user.isOnline) return false;
+      if (showConnectionsOnly && user.connectionStatus !== 'accepted') return false; 
+      
+      return true;
+    });
+  }, [directory, searchTerm, departmentFilter, semesterFilter, sectionFilter, onlineOnly, showConnectionsOnly, blockedUsers, currentUser]);
 
   const sidebarMap = new Map<string, User>();
   conversations.forEach(u => sidebarMap.set(u._id, u));
@@ -529,22 +539,36 @@ function ConnectEngine() {
     }
   });
 
-  const chatSidebarUsers = Array.from(sidebarMap.values())
-    .filter(u => !blockedUsers.has(u._id))
-    .filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => {
-      const aUnread = unreadSenders.has(a._id) ? 1 : 0;
-      const bUnread = unreadSenders.has(b._id) ? 1 : 0;
-      if (aUnread !== bUnread) return bUnread - aUnread; 
-      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1; 
-      return 0; 
+  const chatSidebarUsers = useMemo(() => {
+    const sidebarMap = new Map<string, User>();
+    conversations.forEach(u => sidebarMap.set(u._id, u));
+    directory.forEach(u => {
+      if (unreadSenders.has(u._id) || activeUser?._id === u._id) {
+        sidebarMap.set(u._id, u);
+      }
     });
 
-  const statusQueueUsers = directory.filter(u => ['pending_sent', 'pending_received', 'rejected'].includes(u.connectionStatus));
+    return Array.from(sidebarMap.values())
+      .filter(u => !blockedUsers.has(u._id))
+      .filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => {
+        const aUnread = unreadSenders.has(a._id) ? 1 : 0;
+        const bUnread = unreadSenders.has(b._id) ? 1 : 0;
+        if (aUnread !== bUnread) return bUnread - aUnread; 
+        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1; 
+        return 0; 
+      });
+  }, [conversations, directory, unreadSenders, activeUser, blockedUsers, searchTerm]);
+
+  const statusQueueUsers = useMemo(() => {
+    return directory.filter(u => ['pending_sent', 'pending_received', 'rejected'].includes(u.connectionStatus));
+  }, [directory]);
   
-  const suggestedConnections = directory
-    .filter(u => u.department === currentUser?.department && u.connectionStatus === 'none' && !u.isAlumni)
-    .slice(0, 3); 
+  const suggestedConnections = useMemo(() => {
+    return directory
+      .filter(u => u.department === currentUser?.department && u.connectionStatus === 'none' && !u.isAlumni)
+      .slice(0, 3); 
+  }, [directory, currentUser]);
 
 
   return (

@@ -1,17 +1,15 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, Medal, Award, Flame } from "lucide-react";
-import { cookies } from "next/headers";
 import ProfileClickWrapper from "./ProfileClickWrapper"; 
 import { optimizeImage } from '@/lib/cloudinary';
 
 async function fetchTopUploaders() {
   try {
-    const cookieStore = await cookies();
-    const jwt = cookieStore.get('jwt')?.value;
-
+    // 🚀 THE CURE: We removed the cookies/JWT entirely!
+    // Because it's an unauthenticated fetch, Next.js will cache this globally across ALL users.
+    // It will only hit your MongoDB once every 5 minutes (300 seconds).
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/resources/top-uploaders`, {
-      cache: 'no-store',
-      headers: { Cookie: `jwt=${jwt}` }
+      next: { revalidate: 300 } 
     });
 
     if (!res.ok) return [];

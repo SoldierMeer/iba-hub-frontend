@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '@/lib/api';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
@@ -48,6 +48,33 @@ interface Complaint {
   updatedAt: string; 
 }
 
+// 🚀 THE FIX 1: Native Image Compressor
+// Squashes 5MB photos down to ~100KB before converting to Base64 to save your database!
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800; // Perfect size for web viewing
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Compress to JPEG at 70% quality
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+      };
+      img.onerror = (err) => reject(err);
+    };
+  });
+};
+
 export default function VoicePage() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [globalStats, setGlobalStats] = useState({ total: 0, pending: 0, inProgress: 0, resolved: 0, anonymousPercent: 0, avgRes: '-' });
@@ -70,7 +97,6 @@ export default function VoicePage() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 🚀 FIX 1: Added filterDepartment state properly
   const [filterType, setFilterType] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterDepartment, setFilterDepartment] = useState('All'); 
@@ -84,8 +110,6 @@ export default function VoicePage() {
   const upvoteLocks = useRef<Set<string>>(new Set());
   
   const { requireAuth } = useAuth();
-
-
 
   // 1. Fetch Current User Once on Mount
   useEffect(() => {
@@ -121,9 +145,9 @@ export default function VoicePage() {
     }
   };
 
-  // 3. Trigger Fetch when Filters Change (Safe React 18 Pattern)
+  // 3. Trigger Fetch when Filters Change
   useEffect(() => {
-    let isMounted = true; // Tracks if the user is still on the page
+    let isMounted = true; 
     
     setPage(1); 
     setLoading(true);
@@ -137,7 +161,7 @@ export default function VoicePage() {
         department: filterDepartment
       }
     }).then(res => {
-      if (!isMounted) return; // If user navigated away, safely ignore the data
+      if (!isMounted) return; 
       
       setComplaints(res.data.data);
       if (res.data.stats) setGlobalStats(res.data.stats);
@@ -148,10 +172,7 @@ export default function VoicePage() {
       if (isMounted) setLoading(false);
     });
 
-    // Cleanup function: runs automatically when you navigate to a different page
-    return () => {
-      isMounted = false; 
-    };
+    return () => { isMounted = false; };
   }, [filterType, filterStatus, filterDepartment]); 
 
   // 4. Handle "Load More" Click
@@ -162,12 +183,16 @@ export default function VoicePage() {
     fetchMoreComplaints(nextPage);
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 🚀 THE FIX 1: Applied compression before saving state
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setMediaUrl(reader.result as string);
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file);
+        setMediaUrl(compressedBase64);
+      } catch (err) {
+        toast.error("Failed to process image.");
+      }
     }
   };
 
@@ -181,11 +206,8 @@ export default function VoicePage() {
         title, description, category, department, mediaUrl, isAnonymous
       });
       
-      // 🚀 THE FIX: We removed the code that instantly forces it into the feed.
-      // Instead, we show a success message!
       toast.success("Grievance submitted successfully! It is now pending Admin approval.");
       
-      // Reset the form
       setTitle(''); setDescription(''); setCategory(''); 
       setDepartment('Global'); 
       setMediaUrl(null); setIsAnonymous(false);
@@ -312,6 +334,264 @@ export default function VoicePage() {
     }
   };
 
+  // 🚀 THE FIX 2: Memoize the rendered complaints so typing in the modal doesn't freeze the app!
+  const renderedComplaints = useMemo(() => {
+    return complaints.map(post => {
+      const hasUpvoted = post.upvotes.includes(currentUserId);
+      const isExpanded = activeCommentPost === post._id;
+      const isPostOwnerOrAdmin = String(post.author?._id) === String(currentUserId) || currentUserRole === 'admin' || currentUserRole === 'moderator';
+
+      return (
+        <div key={post._id} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex gap-3 sm:gap-6 items-start relative transition-all hover:shadow-md">
+          {/* UPVOTE COLUMN */}
+            <div className="flex flex-col items-center justify-start pt-1 sm:pt-1.5 shrink-0 gap-0.5 sm:gap-1">
+              <button 
+                aria-label='upvote'
+                onClick={() => handleUpvote(post._id)}
+                disabled={hasUpvoted}
+                className={`p-1 sm:p-1.5 rounded-full transition-colors ${
+                  hasUpvoted ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100 text-slate-400 hover:text-indigo-600'
+                }`}
+              >
+                <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} />
+              </button>
+              
+              <span className={`text-sm sm:text-lg font-black ${post.upvotes.length >= 10 ? 'text-emerald-600' : 'text-slate-700'}`}>
+                {post.upvotes.length}
+              </span>
+              
+              <button 
+                aria-label='remove upvote'
+                onClick={() => handleUpvote(post._id)}
+                disabled={!hasUpvoted}
+                className={`p-1 sm:p-1.5 rounded-full transition-colors ${
+                  !hasUpvoted ? 'text-slate-300 cursor-not-allowed opacity-50' : 'hover:bg-slate-100 text-slate-400 hover:text-red-500'
+                }`}
+              >
+                <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} />
+              </button>
+            </div>
+
+          {/* Content Section */}
+          <div className="flex-1 min-w-0">
+            
+            {/* 🚀 ADDED: Clickable Wrapper for the whole card body */}
+            <div 
+              className="cursor-pointer group" 
+              onClick={() => setActiveCommentPost(isExpanded ? null : post._id)}
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start mb-2 sm:mb-3 gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <span className={`px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${getStatusStyle(post.status)}`}>
+                    {post.status}
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded-md whitespace-nowrap">{post.category}</span>
+                  {post.department && post.department !== 'Global' && (
+                    <span className="text-[9px] sm:text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 sm:px-2 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap truncate max-w-[100px] sm:max-w-none">
+                    {post.department}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto justify-between sm:justify-start">
+                  {/* Admin Updates dropdown menu */}
+                  {(currentUserRole === 'admin' || currentUserRole === 'moderator') && (
+                    <select 
+                      aria-label='set status'
+                      className="text-[9px] sm:text-[10px] font-black bg-slate-900 text-white rounded-full px-2 py-0.5 outline-none cursor-pointer border-none focus:ring-1 focus:ring-indigo-500"
+                      value={post.status}
+                      onChange={(e) => handleStatusUpdate(post._id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()} // 🚀 STOP PROPAGATION (Prevents card expansion when clicking dropdown)
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Under Review">Under Review</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Declined">Declined</option>
+                    </select>
+                  )}
+
+                  <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                    <span className="text-[10px] sm:text-xs font-medium text-slate-500">
+                      {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                    </span>
+                    
+                    {isPostOwnerOrAdmin && (
+                      <button 
+                        aria-label='delete complaint'
+                        onClick={(e) => { e.stopPropagation(); handleDeleteComplaint(post._id); }} // 🚀 STOP PROPAGATION (Prevents card expansion when deleting)
+                        className="p-1 text-slate-500 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors ml-1 relative z-10"
+                        title="Delete Complaint"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Removed individual onClick, added group-hover for the title effect */}
+              <h2 className="text-base sm:text-xl font-bold text-[#0f172a] mb-1.5 sm:mb-2 leading-snug group-hover:text-indigo-600 transition-colors break-words">
+                {post.title}
+              </h2>
+              <p className={`text-slate-600 text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6 ${!isExpanded ? 'line-clamp-2' : 'whitespace-pre-wrap'}`}>
+                {post.description}
+              </p>
+              
+              {isExpanded && post.mediaUrl && (
+                <div className="mb-4 sm:mb-6 rounded-xl sm:rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 p-2 sm:p-0">
+                  <img src={post.mediaUrl} alt="Evidence Document" className="w-full max-h-[250px] sm:max-h-[380px] object-contain mx-auto rounded-lg sm:rounded-none" />
+                </div>
+              )}
+            </div> {/* 🚀 END CLICKABLE WRAPPER */}
+
+            <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-slate-100/80 gap-2">
+              
+              <div 
+                className={`flex items-center gap-2 sm:gap-2.5 min-w-0 ${!post.isAnonymous ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                onClick={() => !post.isAnonymous && setSelectedUserId(post.author?._id)}
+              >
+                <Avatar className="w-6 h-6 sm:w-7 sm:h-7 bg-slate-100 border border-slate-200 shrink-0">
+                  <AvatarImage src={optimizeImage(post.author?.avatarUrl, 100, 100)} alt='user profile'/>
+                  <AvatarFallback className="text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-600">
+                    {post.isAnonymous ? <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-700" /> : post.author?.firstName?.[0] || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-[10px] sm:text-xs font-bold text-slate-700 flex flex-wrap items-center gap-1.5 sm:gap-2 truncate">
+                  <span className="truncate max-w-[80px] sm:max-w-none">{post.isAnonymous ? 'Anonymous Student' : `${post.author?.firstName} ${post.author?.lastName}`}</span>
+                  {(!post.isAnonymous && post.author?.isAlumni) && (
+                    <span className="bg-indigo-100 text-indigo-700 text-[8px] sm:text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-black shrink-0 hidden sm:inline-block">
+                      Alumni
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              <button 
+                aria-label='post'
+                onClick={() => setActiveCommentPost(isExpanded ? null : post._id)}
+                className={`flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-bold transition-all px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0 ${isExpanded ? 'bg-slate-100 text-slate-800' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+              >
+                <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" /> <span>{post.comments.length} <span className="hidden sm:inline">Comments</span></span>
+              </button>
+            </div>
+
+            {/* Expanded Section Layout */}
+            {isExpanded && (
+              <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-100 animate-in fade-in duration-200">
+                
+                {post.officialResponse && (
+                  <div className="bg-[#0f172a] rounded-xl sm:rounded-2xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-sm border border-slate-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-1 sm:gap-0">
+                      <span className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                        <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Official Response Update
+                      </span>
+                      <span className="text-[9px] sm:text-[10px] text-slate-500">Authorized Verdict</span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                      {post.officialResponse}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mb-3 sm:mb-4 flex items-center gap-2">
+                  <h3 className="font-black text-slate-800 text-xs sm:text-sm">Discussions Thread</h3>
+                  <span className="bg-slate-100 text-slate-600 text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full">{post.comments.length}</span>
+                </div>
+
+                <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-6 pl-1.5 sm:pl-2 border-l-2 border-slate-200/60 ml-1 sm:ml-2">
+                  {post.comments.map(comment => {
+                    const hasLikedComment = comment.upvotes?.includes(currentUserId);
+                    const isCommentOwner = String(comment.user?._id) === String(currentUserId) || currentUserRole === 'admin' || currentUserRole === 'moderator';
+
+                    return (
+                      <div key={comment._id} className="relative pl-4 sm:pl-6 group/comment">
+                        
+                        <div 
+                          className="absolute -left-[11px] sm:-left-[15px] top-0.5 bg-[#f8fafc] p-0.5 cursor-pointer hover:scale-105 transition-transform" 
+                          onClick={() => setSelectedUserId(comment.user?._id)}
+                        >
+                          <Avatar className="w-5 h-5 sm:w-6 sm:h-6 border border-slate-200 shadow-sm">
+                            <AvatarImage src={optimizeImage(comment.user?.avatarUrl, 100, 100)} alt='user profile'/>
+                            <AvatarFallback className="text-[7px] sm:text-[8px] font-bold">{comment.user?.firstName?.[0]}</AvatarFallback>
+                          </Avatar>
+                        </div>
+
+                        <div className="bg-slate-50/70 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-slate-200/60 flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-4">
+                          <div className="flex-1 w-full min-w-0">
+                            <div className="flex justify-between items-center mb-1 gap-2">
+                              
+                              <span 
+                                className="text-[10px] sm:text-xs font-bold text-slate-800 flex items-center gap-1.5 sm:gap-2 cursor-pointer hover:text-indigo-600 transition-colors truncate"
+                                onClick={() => setSelectedUserId(comment.user?._id)}
+                              >
+                                <span className="truncate">{comment.user?.firstName} {comment.user?.lastName}</span>
+                                {comment.user?.isAlumni && (
+                                  <span className="bg-indigo-100 text-indigo-700 text-[7px] sm:text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-black shrink-0 hidden sm:inline-block">
+                                    Alumni
+                                  </span>
+                                )}
+                              </span>
+                              
+                              <span className="text-[8px] sm:text-[9px] font-semibold text-slate-500 shrink-0">{new Date(comment.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed break-words">{comment.text}</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 sm:mt-0.5 self-end sm:self-start shrink-0">
+                            <button 
+                              aria-label='comment like'
+                              onClick={() => handleCommentLike(post._id, comment._id)}
+                              className={`flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-1 rounded-md transition-colors ${hasLikedComment ? 'text-red-500 bg-red-50' : 'text-slate-500 hover:text-red-500 hover:bg-slate-100'}`}
+                            >
+                              <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${hasLikedComment ? 'fill-red-500' : ''}`} />
+                              <span>{comment.upvotes?.length || 0}</span>
+                            </button>
+
+                            {isCommentOwner && (
+                              <button 
+                                aria-label='delete comment'
+                                onClick={() => handleDeleteComment(post._id, comment._id)}
+                                className="p-1 sm:p-1.5 text-slate-500 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors"
+                                title="Delete Comment"
+                              >
+                                <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-1.5 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                  <input 
+                    type="text" 
+                    placeholder="Add a constructive comment..." 
+                    className="flex-1 text-xs sm:text-sm border-none bg-transparent focus:ring-0 px-2 sm:px-3 py-1.5 sm:py-0 outline-none"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCommentSubmit(post._id)}
+                  />
+                  <button 
+                    aria-label='comment submit'
+                    onClick={() => handleCommentSubmit(post._id)}
+                    disabled={!commentText.trim()}
+                    className="bg-[#0f172a] hover:bg-slate-800 text-white text-[10px] sm:text-xs font-black px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-colors disabled:opacity-50 shrink-0 w-full sm:w-auto"
+                  >
+                    Comment
+                  </button>
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    });
+  }, [complaints, currentUserId, currentUserRole, activeCommentPost, commentText]);
 
   return (
     <ProtectedRoute>
@@ -412,7 +692,6 @@ export default function VoicePage() {
            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 px-1 sm:px-3 flex-1 sm:flex-none">
              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase sm:capitalize tracking-wider sm:tracking-normal pl-1 sm:pl-0">Department</span>
              <div className="w-full sm:w-auto bg-slate-50 sm:bg-transparent rounded-lg sm:rounded-none border border-slate-200 sm:border-none p-1 sm:p-0">
-               {/* 🚀 FIX 4: Corrected value and onChange wiring */}
                <select aria-label='departments' value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)} className="w-full sm:w-auto text-xs sm:text-sm font-semibold text-slate-800 bg-transparent border-none focus:ring-0 cursor-pointer outline-none px-2 py-1.5 sm:py-0">
                  <option value="All">All Departments</option>
                  <option value="Computer Science">CS</option>
@@ -437,254 +716,8 @@ export default function VoicePage() {
             ) : complaints.length === 0 ? (
               <div className="text-center py-16 sm:py-20 bg-white border border-slate-200 rounded-3xl text-slate-500 text-sm sm:text-base font-medium shadow-sm px-4">No complaints registered matching these criteria.</div>
             ) : (
-              complaints.map(post => {
-                const hasUpvoted = post.upvotes.includes(currentUserId);
-                const isExpanded = activeCommentPost === post._id;
-                const isPostOwnerOrAdmin = String(post.author?._id) === String(currentUserId) || currentUserRole === 'admin' || currentUserRole === 'moderator';
-
-                return (
-                  <div key={post._id} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex gap-3 sm:gap-6 items-start relative transition-all hover:shadow-md">
-                    
-                    {/* UPVOTE COLUMN */}
-                      <div className="flex flex-col items-center justify-start pt-1 sm:pt-1.5 shrink-0 gap-0.5 sm:gap-1">
-                        <button 
-                          aria-label='upvote'
-                          onClick={() => handleUpvote(post._id)}
-                          disabled={hasUpvoted}
-                          className={`p-1 sm:p-1.5 rounded-full transition-colors ${
-                            hasUpvoted ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100 text-slate-400 hover:text-indigo-600'
-                          }`}
-                        >
-                          <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} />
-                        </button>
-                        
-                        <span className={`text-sm sm:text-lg font-black ${post.upvotes.length >= 10 ? 'text-emerald-600' : 'text-slate-700'}`}>
-                          {post.upvotes.length}
-                        </span>
-                        
-                        <button 
-                          aria-label='remove upvote'
-                          onClick={() => handleUpvote(post._id)}
-                          disabled={!hasUpvoted}
-                          className={`p-1 sm:p-1.5 rounded-full transition-colors ${
-                            !hasUpvoted ? 'text-slate-300 cursor-not-allowed opacity-50' : 'hover:bg-slate-100 text-slate-400 hover:text-red-500'
-                          }`}
-                        >
-                          <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} />
-                        </button>
-                      </div>
-
-                    {/* Content Section */}
-                    <div className="flex-1 min-w-0">
-                      
-                      <div className="flex flex-col sm:flex-row justify-between items-start mb-2 sm:mb-3 gap-2">
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                          <span className={`px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${getStatusStyle(post.status)}`}>
-                            {post.status}
-                          </span>
-                          <span className="text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded-md whitespace-nowrap">{post.category}</span>
-                          {post.department && post.department !== 'Global' && (
-                            <span className="text-[9px] sm:text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 sm:px-2 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap truncate max-w-[100px] sm:max-w-none">
-                            {post.department}
-                            </span>
-                            )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto justify-between sm:justify-start">
-                          {/* Admin Updates dropdown menu */}
-                          {(currentUserRole === 'admin' || currentUserRole === 'moderator') && (
-                            <select 
-                              aria-label='set status'
-                              className="text-[9px] sm:text-[10px] font-black bg-slate-900 text-white rounded-full px-2 py-0.5 outline-none cursor-pointer border-none focus:ring-1 focus:ring-indigo-500"
-                              value={post.status}
-                              onChange={(e) => handleStatusUpdate(post._id, e.target.value)}
-                            >
-                              <option value="Pending">Pending</option>
-                              <option value="Under Review">Under Review</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Resolved">Resolved</option>
-                              <option value="Declined">Declined</option>
-                            </select>
-                          )}
-
-                          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                            <span className="text-[10px] sm:text-xs font-medium text-slate-500">
-                              {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
-                            </span>
-                            
-                            {isPostOwnerOrAdmin && (
-                              <button 
-                                aria-label='delete complaint'
-                                onClick={() => handleDeleteComplaint(post._id)}
-                                className="p-1 text-slate-500 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors ml-1"
-                                title="Delete Complaint"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <h2 className="text-base sm:text-xl font-bold text-[#0f172a] mb-1.5 sm:mb-2 leading-snug cursor-pointer hover:text-indigo-600 transition-colors break-words" onClick={() => setActiveCommentPost(isExpanded ? null : post._id)}>
-                        {post.title}
-                      </h2>
-                      <p className={`text-slate-600 text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6 ${!isExpanded ? 'line-clamp-2' : 'whitespace-pre-wrap'}`}>
-                        {post.description}
-                      </p>
-
-                      {isExpanded && post.mediaUrl && (
-                        <div className="mb-4 sm:mb-6 rounded-xl sm:rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 p-2 sm:p-0">
-                          <img src={post.mediaUrl} alt="Evidence Document" className="w-full max-h-[250px] sm:max-h-[380px] object-contain mx-auto rounded-lg sm:rounded-none" />
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-slate-100/80 gap-2">
-                        
-                        <div 
-                          className={`flex items-center gap-2 sm:gap-2.5 min-w-0 ${!post.isAnonymous ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                          onClick={() => !post.isAnonymous && setSelectedUserId(post.author?._id)}
-                        >
-                          <Avatar className="w-6 h-6 sm:w-7 sm:h-7 bg-slate-100 border border-slate-200 shrink-0">
-                            <AvatarImage src={optimizeImage(post.author?.avatarUrl, 100, 100)} alt='user profile'/>
-                            <AvatarFallback className="text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-600">
-                              {post.isAnonymous ? <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-700" /> : post.author?.firstName?.[0] || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-[10px] sm:text-xs font-bold text-slate-700 flex flex-wrap items-center gap-1.5 sm:gap-2 truncate">
-                            <span className="truncate max-w-[80px] sm:max-w-none">{post.isAnonymous ? 'Anonymous Student' : `${post.author?.firstName} ${post.author?.lastName}`}</span>
-                            {(!post.isAnonymous && post.author?.isAlumni) && (
-                              <span className="bg-indigo-100 text-indigo-700 text-[8px] sm:text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-black shrink-0 hidden sm:inline-block">
-                                Alumni
-                              </span>
-                            )}
-                          </span>
-                        </div>
-
-                        <button 
-                          aria-label='post'
-                          onClick={() => setActiveCommentPost(isExpanded ? null : post._id)}
-                          className={`flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-bold transition-all px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0 ${isExpanded ? 'bg-slate-100 text-slate-800' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                        >
-                          <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" /> <span>{post.comments.length} <span className="hidden sm:inline">Comments</span></span>
-                        </button>
-                      </div>
-
-                      {/* Expanded Section Layout */}
-                      {isExpanded && (
-                        <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-100 animate-in fade-in duration-200">
-                          
-                          {post.officialResponse && (
-                            <div className="bg-[#0f172a] rounded-xl sm:rounded-2xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-sm border border-slate-800">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-1 sm:gap-0">
-                                <span className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-                                  <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Official Response Update
-                                </span>
-                                <span className="text-[9px] sm:text-[10px] text-slate-500">Authorized Verdict</span>
-                              </div>
-                              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                                {post.officialResponse}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="mb-3 sm:mb-4 flex items-center gap-2">
-                            <h3 className="font-black text-slate-800 text-xs sm:text-sm">Discussions Thread</h3>
-                            <span className="bg-slate-100 text-slate-600 text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full">{post.comments.length}</span>
-                          </div>
-
-                          <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-6 pl-1.5 sm:pl-2 border-l-2 border-slate-200/60 ml-1 sm:ml-2">
-                            {post.comments.map(comment => {
-                              const hasLikedComment = comment.upvotes?.includes(currentUserId);
-                              const isCommentOwner = String(comment.user?._id) === String(currentUserId) || currentUserRole === 'admin' || currentUserRole === 'moderator';
-
-                              return (
-                                <div key={comment._id} className="relative pl-4 sm:pl-6 group/comment">
-                                  
-                                  <div 
-                                    className="absolute -left-[11px] sm:-left-[15px] top-0.5 bg-[#f8fafc] p-0.5 cursor-pointer hover:scale-105 transition-transform" 
-                                    onClick={() => setSelectedUserId(comment.user?._id)}
-                                  >
-                                    <Avatar className="w-5 h-5 sm:w-6 sm:h-6 border border-slate-200 shadow-sm">
-                                      <AvatarImage src={optimizeImage(comment.user?.avatarUrl, 100, 100)} alt='user profile'/>
-                                      <AvatarFallback className="text-[7px] sm:text-[8px] font-bold">{comment.user?.firstName?.[0]}</AvatarFallback>
-                                    </Avatar>
-                                  </div>
-
-                                  <div className="bg-slate-50/70 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-slate-200/60 flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-4">
-                                    <div className="flex-1 w-full min-w-0">
-                                      <div className="flex justify-between items-center mb-1 gap-2">
-                                        
-                                        <span 
-                                          className="text-[10px] sm:text-xs font-bold text-slate-800 flex items-center gap-1.5 sm:gap-2 cursor-pointer hover:text-indigo-600 transition-colors truncate"
-                                          onClick={() => setSelectedUserId(comment.user?._id)}
-                                        >
-                                          <span className="truncate">{comment.user?.firstName} {comment.user?.lastName}</span>
-                                          {comment.user?.isAlumni && (
-                                            <span className="bg-indigo-100 text-indigo-700 text-[7px] sm:text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-black shrink-0 hidden sm:inline-block">
-                                              Alumni
-                                            </span>
-                                          )}
-                                        </span>
-                                        
-                                        <span className="text-[8px] sm:text-[9px] font-semibold text-slate-500 shrink-0">{new Date(comment.createdAt).toLocaleDateString()}</span>
-                                      </div>
-                                      <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed break-words">{comment.text}</p>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-1 sm:mt-0.5 self-end sm:self-start shrink-0">
-                                      <button 
-                                        aria-label='comment like'
-                                        onClick={() => handleCommentLike(post._id, comment._id)}
-                                        className={`flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-1 rounded-md transition-colors ${hasLikedComment ? 'text-red-500 bg-red-50' : 'text-slate-500 hover:text-red-500 hover:bg-slate-100'}`}
-                                      >
-                                        <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${hasLikedComment ? 'fill-red-500' : ''}`} />
-                                        <span>{comment.upvotes?.length || 0}</span>
-                                      </button>
-
-                                      {isCommentOwner && (
-                                        <button 
-                                          aria-label='delete comment'
-                                          onClick={() => handleDeleteComment(post._id, comment._id)}
-                                          className="p-1 sm:p-1.5 text-slate-500 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors"
-                                          title="Delete Comment"
-                                        >
-                                          <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-1.5 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                            <input 
-                              type="text" 
-                              placeholder="Add a constructive comment..." 
-                              className="flex-1 text-xs sm:text-sm border-none bg-transparent focus:ring-0 px-2 sm:px-3 py-1.5 sm:py-0 outline-none"
-                              value={commentText}
-                              onChange={(e) => setCommentText(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleCommentSubmit(post._id)}
-                            />
-                            <button 
-                              aria-label='comment submit'
-                              onClick={() => handleCommentSubmit(post._id)}
-                              disabled={!commentText.trim()}
-                              className="bg-[#0f172a] hover:bg-slate-800 text-white text-[10px] sm:text-xs font-black px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-colors disabled:opacity-50 shrink-0 w-full sm:w-auto"
-                            >
-                              Comment
-                            </button>
-                          </div>
-
-                        </div>
-                      )}
-
-                    </div>
-                  </div>
-                );
-              })
+              // 🚀 THE FIX 2: Render the memoized list instead of calculating it raw!
+              renderedComplaints
             )}
 
             {/* SERVER-SIDE LOAD MORE BUTTON */}
@@ -836,7 +869,7 @@ export default function VoicePage() {
                       <UploadCloud className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
                     </div>
                     <p className="text-xs sm:text-sm font-black text-slate-800 mb-0.5 text-center">Click to upload image</p>
-                    <p className="text-[9px] sm:text-xs font-bold text-slate-500 text-center">PNG, JPG or JPEG (max. 10MB)</p>
+                    <p className="text-[9px] sm:text-xs font-bold text-slate-500 text-center">PNG, JPG or JPEG (Auto-compressed)</p>
                   </div>
                 ) : (
                   <div className="relative border border-slate-200 rounded-xl sm:rounded-2xl p-2 bg-slate-50 inline-block w-fit">

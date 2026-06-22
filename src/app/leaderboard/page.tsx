@@ -8,13 +8,25 @@ import { optimizeImage } from '@/lib/cloudinary';
 async function getLeaderboardPageData(tab: string) {
   const cookieStore = await cookies();
   const token = cookieStore.get('jwt')?.value || cookieStore.get('token')?.value;
-  const headers = { Cookie: token ? `jwt=${token}; token=${token}` : '' };
+  const authHeaders = { Cookie: token ? `jwt=${token}; token=${token}` : '' };
   
   try {
     const [lbRes, meRes, actRes] = await Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/leaderboard?filter=${tab}`, { cache: 'no-store', headers }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/me`, { cache: 'no-store', headers }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/activity`, { cache: 'no-store', headers })
+      // 🚀 THE FIX: Removed `headers: authHeaders`!
+      // By sending no cookies, Next.js guarantees this response is cached globally for 60 seconds.
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/leaderboard?filter=${tab}`, { 
+        next: { revalidate: 60 } 
+      }),
+      
+      // These routes return private user data, so they MUST use authHeaders and MUST NOT be cached.
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/me`, { 
+        cache: 'no-store', 
+        headers: authHeaders 
+      }),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/activity`, { 
+        cache: 'no-store', 
+        headers: authHeaders 
+      })
     ]);
   
     const lbJson = lbRes.ok ? await lbRes.json() : { data: [] };
@@ -42,6 +54,12 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
   const currentUser = currentUserIndex !== -1 ? users[currentUserIndex] : null;
   const currentRank = currentUserIndex !== -1 ? currentUserIndex + 1 : '-';
 
+  // 🚀 FAST FALLBACK: If the user is outside the Top 50, grab their points from their 'me' profile!
+  let displayScore = currentUser?.score || 0;
+  if (!currentUser && me && (currentTab === 'overall' || currentTab === 'all_time')) {
+    displayScore = me.contributorPoints || 0;
+  }
+
   let targetScore = 500;
   let pointsNeeded = 150;
   let targetRankLabel: string | number = '-';
@@ -58,8 +76,14 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
           targetRankLabel = `#${currentUserIndex}`;
       }
       pointsNeeded = targetScore - currentUser.score;
+  } else if (displayScore > 0) {
+      // If they have points but aren't top 50, their target is the 50th person's score!
+      targetScore = users.length === 50 ? users[49].score + 5 : displayScore + 50;
+      pointsNeeded = targetScore - displayScore;
+      targetRankLabel = "Top 50";
   }
-  const progressPercent = currentUser ? Math.min(100, (currentUser.score / targetScore) * 100) : 0;
+
+  const progressPercent = displayScore > 0 ? Math.min(100, (displayScore / targetScore) * 100) : 0;
 
   const deptPointsMap: { [key: string]: number } = {};
   users.forEach((u: any) => {
@@ -90,15 +114,15 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
           </div>
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center sm:items-start text-center sm:text-left">
             <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Points</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900">{currentUser?.score || 0}</p>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900">{displayScore}</p>
           </div>
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center sm:items-start text-center sm:text-left">
             <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Uploads</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900">{currentUser?.uploads || 0}</p>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900">{currentUser?.uploads || (me ? '...' : 0)}</p>
           </div>
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center sm:items-start text-center sm:text-left">
             <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Replies</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900">{currentUser?.replies || 0}</p>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900">{currentUser?.replies || (me ? '...' : 0)}</p>
           </div>
         </div>
 
@@ -265,7 +289,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
               
               <div className="mb-5 sm:mb-6">
                 <div className="flex justify-between text-[10px] sm:text-xs font-bold mb-2">
-                  <span className="text-slate-500">Current: {currentUser?.score || 0} pts <span className="text-slate-500">({currentRank !== '-' ? `#${currentRank}` : '-'})</span></span>
+                  <span className="text-slate-500">Current: {displayScore} pts <span className="text-slate-500">({currentRank !== '-' ? `#${currentRank}` : '-'})</span></span>
                   <span className="text-slate-900">Target: {targetScore} pts <span className="text-slate-500">({targetRankLabel})</span></span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-1.5 sm:h-2 mb-2">

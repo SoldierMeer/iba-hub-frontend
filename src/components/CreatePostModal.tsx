@@ -6,10 +6,11 @@ import { PlusCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import toast from 'react-hot-toast'; // 🚀 Added toast for better UX
 
 export default function CreatePostModal() {
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // We can safely remove the 'loading' state since the UI closes instantly now!
   const { requireAuth } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -19,36 +20,40 @@ export default function CreatePostModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.content) return alert('Title and content are required');
+    if (!formData.title || !formData.content) return toast.error('Title and content are required');
     
-    setLoading(true);
+    // 🚀 1. CAPTURE DATA LOCALLY
+    const payload = { ...formData };
+    const processedTags = payload.tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
 
+    // 🚀 2. INSTANT UI RESET (Non-blocking)
+    setFormData({ title: '', content: '', category: 'General', tags: '' });
+    setIsOpen(false);
+    toast.success("Posting your query..."); // Let the user know it's happening in the background
+
+    // 🚀 3. BACKGROUND FETCH
     try {
-      const processedTags = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
-
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/forum`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          title: formData.title,
-          content: formData.content,
-          category: formData.category, 
+          title: payload.title,
+          content: payload.content,
+          category: payload.category, 
           tags: processedTags
         })
       });
 
       if (!res.ok) throw new Error('Failed to create post');
 
-      setFormData({ title: '', content: '', category: 'General', tags: '' });
-      setIsOpen(false);
-      router.refresh();
+      // 🚀 4. SILENT DATA REFRESH
+      // This fetches the new data from the server and magically pops it onto the screen
+      router.refresh(); 
       
     } catch (error) {
       console.error(error);
-      alert('Something went wrong. Is your backend running?');
-    } finally {
-      setLoading(false);
+      toast.error('Something went wrong. Could not save post.');
     }
   };
 
@@ -128,8 +133,8 @@ export default function CreatePostModal() {
                 <Button aria-label='cancel' type="button" variant="outline" onClick={() => setIsOpen(false)} className="rounded-xl h-10 sm:h-11 w-full sm:w-auto px-6 border-slate-200">
                   Cancel
                 </Button>
-                <Button aria-label='submit' type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-10 sm:h-11 w-full sm:w-auto px-6 shadow-sm">
-                  {loading ? 'Posting...' : 'Post Query'}
+                <Button aria-label='submit' type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-10 sm:h-11 w-full sm:w-auto px-6 shadow-sm">
+                  Post Query
                 </Button>
               </div>
             </form>

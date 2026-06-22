@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react'; // 🚀 Added useRef
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, SlidersHorizontal, RefreshCw } from 'lucide-react';
 
-let searchTimeout: NodeJS.Timeout;
-
 export default function ResourceFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // 🚀 FIXED: Bind the timeout to this specific component instance
+  const searchTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const updateParams = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -20,6 +21,8 @@ export default function ResourceFilters() {
     } else {
       params.delete(key);
     }
+    // Reset to page 1 whenever a filter changes!
+    params.delete('page'); 
     router.push(`?${params.toString()}`);
   };
 
@@ -40,10 +43,11 @@ export default function ResourceFilters() {
           className="w-full pl-10 border-slate-200 md:border-transparent bg-slate-50 hover:bg-slate-100 focus:bg-white rounded-xl transition-colors text-sm h-11"
           defaultValue={searchParams.get('search') || ''}
           onChange={(e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
+            // 🚀 FIXED: Proper React cleanup for debouncing
+            if (searchTimeout.current) clearTimeout(searchTimeout.current);
+            searchTimeout.current = setTimeout(() => {
               updateParams('search', e.target.value);
-            }, 300);
+            }, 500); // Bumped to 500ms to protect the database from rapid typers
           }}
         />
       </div>

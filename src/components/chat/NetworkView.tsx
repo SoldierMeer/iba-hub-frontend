@@ -1,7 +1,6 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-// 🚀 ADDED: MessageSquare icon import
 import { Search, Users, GraduationCap, UserCheck, Hourglass, UserPlus, Star, ArrowRight, MessageSquare } from 'lucide-react';
 import { User } from '@/app/chat/page';
 import { optimizeImage } from '@/lib/cloudinary';
@@ -25,7 +24,6 @@ interface NetworkViewProps {
   handleConnectionAction: (id: string, action: any, name: string) => void;
   setSelectedProfile: (user: User) => void;
   router: any;
-  // 🚀 ADDED THIS PROP
   handleUserSelect: (user: User) => void; 
 }
 
@@ -33,7 +31,7 @@ export default function NetworkView({
   currentUser, directory, displayedDirectory, suggestedConnections, statusQueueUsers,
   searchTerm, setSearchTerm, departmentFilter, setDepartmentFilter,
   semesterFilter, setSemesterFilter, sectionFilter, setSectionFilter, showConnectionsOnly, setShowConnectionsOnly,
-  handleConnectionAction, setSelectedProfile, router, handleUserSelect // 🚀 DESTRUCTURED HERE
+  handleConnectionAction, setSelectedProfile, router, handleUserSelect
 }: NetworkViewProps) {
 
   const DEPARTMENTS = [
@@ -70,7 +68,7 @@ export default function NetworkView({
         </div>
       )}
 
-      {/* FILTER BAR */}
+      {/* FILTER BAR (Hidden for Alumni as requested) */}
       {!currentUser?.isAlumni && (
         <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4 mb-6 sm:mb-8 flex flex-col xl:flex-row items-center gap-3 sm:gap-4">
           <div className="relative flex-1 w-full">
@@ -124,119 +122,106 @@ export default function NetworkView({
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8 items-start">
-        {/* Users Grid */}
-        {currentUser?.isAlumni ? (
-          <div className="lg:col-span-3 bg-white rounded-2xl sm:rounded-[2rem] border border-slate-200 shadow-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center min-h-[300px] sm:min-h-[400px] animate-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-full flex items-center justify-center mb-4 sm:mb-6 border border-indigo-100 shadow-inner">
-              <Users className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-500" />
+        
+        {/* 🚀 FIXED: Removed the if/else Alumni block here! Now Alumni and Students use the exact same grid, but the data is automatically filtered by useMemo! */}
+        <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 order-2 lg:order-1">
+          {displayedDirectory.length === 0 ? (
+            <div className="col-span-full py-16 sm:py-20 text-center bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm px-4">
+              <Users className="w-8 h-8 sm:w-10 sm:h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm sm:text-base text-slate-500 font-bold">
+                {currentUser?.isAlumni ? "You don't have any active connections yet." : "No students found matching your criteria."}
+              </p>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 sm:mb-3">Connection Manager</h2>
-            <p className="text-sm sm:text-base text-slate-500 font-medium max-w-md mb-6 sm:mb-8 leading-relaxed">
-              As an Alumni, your networking is streamlined. Use the <span className="font-bold text-slate-700">Connection Status</span> panel to manage incoming requests.
-            </p>
-            <Button onClick={() => router.push('/alumni')} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl font-bold px-6 py-5 sm:px-8 sm:py-6 shadow-lg flex items-center gap-2 transition-all w-full sm:w-auto">
-              Explore Alumni Network <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Button>
-          </div>
-        ) : (
-          <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 order-2 lg:order-1">
-            {displayedDirectory.length === 0 ? (
-              <div className="col-span-full py-16 sm:py-20 text-center bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm px-4">
-                <Users className="w-8 h-8 sm:w-10 sm:h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm sm:text-base text-slate-500 font-bold">No students found matching your criteria.</p>
-              </div>
-            ) : (
-            displayedDirectory.map(user => {
-              const status = user.connectionStatus;
-              const fullName = `${user.firstName} ${user.lastName}`;
+          ) : (
+          displayedDirectory.map(user => {
+            const status = user.connectionStatus;
+            const fullName = `${user.firstName} ${user.lastName}`;
 
-              let connectionButton = null;
-              if (status === 'accepted') {
+            let connectionButton = null;
+            if (status === 'accepted') {
+              connectionButton = (
+                <button onClick={() => handleConnectionAction(user._id, 'remove', fullName)} className="w-full py-2 text-xs font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
+                  <UserCheck className="w-3.5 h-3.5" /> Connected
+                </button>
+              );
+            } else if (status === 'pending_sent') {
                 connectionButton = (
-                  <button onClick={() => handleConnectionAction(user._id, 'remove', fullName)} className="w-full py-2 text-xs font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
-                    <UserCheck className="w-3.5 h-3.5" /> Connected
+                  <button onClick={() => handleConnectionAction(user._id, 'remove', fullName)} className="w-full py-2 text-xs font-bold rounded-lg bg-white border border-yellow-200 text-yellow-700 hover:bg-yellow-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
+                    <Hourglass className="w-3.5 h-3.5" /> Pending
                   </button>
                 );
-              } else if (status === 'pending_sent') {
-                  connectionButton = (
-                    <button onClick={() => handleConnectionAction(user._id, 'remove', fullName)} className="w-full py-2 text-xs font-bold rounded-lg bg-white border border-yellow-200 text-yellow-700 hover:bg-yellow-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
-                      <Hourglass className="w-3.5 h-3.5" /> Pending
-                    </button>
-                  );
-              } else if (status === 'pending_received') {
-                  connectionButton = (
-                    <div className="w-full grid grid-cols-2 gap-1.5">
-                       <button onClick={() => handleConnectionAction(user._id, 'accept', fullName)} className="py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-blue-600 border border-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center justify-center gap-1 shadow-sm border">Accept</button>
-                       <button onClick={() => handleConnectionAction(user._id, 'remove', fullName)} className="py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1 shadow-sm border">Decline</button>
-                    </div>
-                  );
-              } else if (status === 'rejected') {
-                  connectionButton = (
-                    <button onClick={() => handleConnectionAction(user._id, 'send', fullName)} className="w-full py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
-                      <UserPlus className="w-3.5 h-3.5" /> Send Again
-                    </button>
-                  );
-              } else {
-                  connectionButton = (
-                    <button onClick={() => handleConnectionAction(user._id, 'send', fullName)} className="w-full py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-[#0f172a] border-[#0f172a] hover:bg-slate-800 text-white transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
-                      <UserPlus className="w-3.5 h-3.5" /> Connect
-                    </button>
-                  );
-              }
+            } else if (status === 'pending_received') {
+                connectionButton = (
+                  <div className="w-full grid grid-cols-2 gap-1.5">
+                     <button onClick={() => handleConnectionAction(user._id, 'accept', fullName)} className="py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-blue-600 border border-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center justify-center gap-1 shadow-sm border">Accept</button>
+                     <button onClick={() => handleConnectionAction(user._id, 'remove', fullName)} className="py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1 shadow-sm border">Decline</button>
+                  </div>
+                );
+            } else if (status === 'rejected') {
+                connectionButton = (
+                  <button onClick={() => handleConnectionAction(user._id, 'send', fullName)} className="w-full py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
+                    <UserPlus className="w-3.5 h-3.5" /> Send Again
+                  </button>
+                );
+            } else {
+                connectionButton = (
+                  <button onClick={() => handleConnectionAction(user._id, 'send', fullName)} className="w-full py-2 text-[10px] sm:text-xs font-bold rounded-lg bg-[#0f172a] border-[#0f172a] hover:bg-slate-800 text-white transition-colors flex items-center justify-center gap-1.5 shadow-sm border">
+                    <UserPlus className="w-3.5 h-3.5" /> Connect
+                  </button>
+                );
+            }
 
-              return (
-                <div key={user._id} className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 hover:shadow-md transition-shadow flex flex-col">
-                  <div className="flex justify-between items-start mb-3 sm:mb-4">
-                    <div className="relative">
-                      <Avatar className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white shadow-sm cursor-pointer" onClick={() => setSelectedProfile(user)}>
-                        <AvatarImage alt='user profile' src={optimizeImage(user.avatarUrl, 100, 100)} />
-                        <AvatarFallback className="bg-slate-100 text-slate-600 text-base sm:text-lg font-bold">{user.firstName[0]}</AvatarFallback>
-                      </Avatar>
-                    </div>
-                    {user.isOnline ? (
-                      <span className="flex items-center gap-1 sm:gap-1.5 bg-emerald-50 text-emerald-700 text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider border border-emerald-100">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Online
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 sm:gap-1.5 bg-slate-50 text-slate-500 text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider border border-slate-200">
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Offline
-                      </span>
-                    )}
+            return (
+              <div key={user._id} className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 hover:shadow-md transition-shadow flex flex-col">
+                <div className="flex justify-between items-start mb-3 sm:mb-4">
+                  <div className="relative">
+                    <Avatar className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white shadow-sm cursor-pointer" onClick={() => setSelectedProfile(user)}>
+                      <AvatarImage alt='user profile' src={optimizeImage(user.avatarUrl, 100, 100)} />
+                      <AvatarFallback className="bg-slate-100 text-slate-600 text-base sm:text-lg font-bold">{user.firstName[0]}</AvatarFallback>
+                    </Avatar>
                   </div>
-                  
-                  <div className="mb-4 flex-1">
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-1 cursor-pointer hover:underline truncate" onClick={() => setSelectedProfile(user)}>
-                      <span className="truncate">{fullName}</span> {user.contributorPoints > 50 && <span title="Top Contributor" className="flex shrink-0">
-                        <Star className="w-6 h-6 text-amber-400 fill-amber-400" />
-                        </span>}
-                    </h3>
-                    <p className="text-xs sm:text-sm font-semibold text-slate-500 mb-1.5 sm:mb-2 truncate">{user.department} • Sem {user.semester?.replace(/\D/g,'')} • Sec {user.section || 'A'}</p>
-                    <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
-                      {user.headline || `Studying ${user.department} at IBA Hub.`}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-auto">
-                    {connectionButton}
-                    {/* 🚀 FIXED: Swapped View Profile for direct Message Button */}
-                    <button 
-                      onClick={() => handleUserSelect(user)} 
-                      className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] sm:text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1.5"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" /> Message
-                    </button>
-                  </div>
+                  {user.isOnline ? (
+                    <span className="flex items-center gap-1 sm:gap-1.5 bg-emerald-50 text-emerald-700 text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider border border-emerald-100">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Online
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 sm:gap-1.5 bg-slate-50 text-slate-500 text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider border border-slate-200">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Offline
+                    </span>
+                  )}
                 </div>
-              )
-            })
-          )}
-          </div>
-          )}
+                
+                <div className="mb-4 flex-1">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-1 cursor-pointer hover:underline truncate" onClick={() => setSelectedProfile(user)}>
+                    <span className="truncate">{fullName}</span> {user.contributorPoints > 50 && <span title="Top Contributor" className="flex shrink-0">
+                      <Star className="w-6 h-6 text-amber-400 fill-amber-400" />
+                      </span>}
+                  </h3>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-500 mb-1.5 sm:mb-2 truncate">{user.department} • Sem {user.semester?.replace(/\D/g,'')} • Sec {user.section || 'A'}</p>
+                  <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                    {user.headline || `Studying ${user.department} at IBA Hub.`}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-auto">
+                  {connectionButton}
+                  <button 
+                    onClick={() => handleUserSelect(user)} 
+                    className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] sm:text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Message
+                  </button>
+                </div>
+              </div>
+            )
+          })
+        )}
+        </div>
 
         {/* Right Sidebars */}
         <div className="lg:col-span-1 space-y-4 sm:space-y-6 order-1 lg:order-2">
           
-          {/* Suggested Connections */}
+          {/* Suggested Connections (Hidden for Alumni) */}
           {!currentUser?.isAlumni && (
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-5">
             <h3 className="font-black text-slate-900 text-[10px] sm:text-xs uppercase tracking-wider mb-3 sm:mb-4">Suggested Connections</h3>

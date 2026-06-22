@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
 import { Search, MessageSquare, Circle, Smile, Paperclip, X, CheckCircle2, BellOff, BellRing, Ban, Flag, ArrowLeft, Send, Loader2 } from 'lucide-react';
@@ -43,7 +43,31 @@ interface MessagesViewProps {
 }
 
 export default function MessagesView(props: MessagesViewProps) {
-  
+
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 🚀 2. UseEffect to handle clicking outside the Emoji Picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // If picker is open, and click is NOT inside the picker, AND click is NOT on the toggle button
+      if (
+        props.showEmojiPicker &&
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node) &&
+        emojiButtonRef.current &&
+        !emojiButtonRef.current.contains(event.target as Node)
+      ) {
+        props.setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [props.showEmojiPicker, props.setShowEmojiPicker]);
+
   const formatMessageDateGroup = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -250,7 +274,11 @@ export default function MessagesView(props: MessagesViewProps) {
               )}
               
               {props.showEmojiPicker && (
-                <div className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 sm:left-4 sm:translate-x-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 max-w-[95vw]">
+                <div 
+                  ref={emojiPickerRef} // <-- Add this ref
+                  // 👇 Change the classes here:
+                  className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 sm:left-auto sm:right-16 sm:translate-x-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 max-w-[95vw]"
+                >
                   <EmojiPicker onEmojiClick={(e) => props.setNewMessage(prev => prev + e.emoji)} width={typeof window !== 'undefined' && window.innerWidth < 640 ? 300 : 320} height={350} />
                 </div>
               )}
@@ -269,7 +297,7 @@ export default function MessagesView(props: MessagesViewProps) {
                   onClick={() => props.setShowEmojiPicker(false)}
                 />
                 
-                <button type="button" onClick={() => props.setShowEmojiPicker(!props.showEmojiPicker)} className="p-1.5 sm:p-2 text-slate-500 hover:text-[#0f172a] hover:bg-slate-200/50 rounded-full sm:rounded-xl transition-colors shrink-0 sm:block">
+                <button ref={emojiButtonRef} type="button" onClick={() => props.setShowEmojiPicker(!props.showEmojiPicker)} className="p-1.5 sm:p-2 text-slate-500 hover:text-[#0f172a] hover:bg-slate-200/50 rounded-full sm:rounded-xl transition-colors shrink-0 sm:block">
                   <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
 

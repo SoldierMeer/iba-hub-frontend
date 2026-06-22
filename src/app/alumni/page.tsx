@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '@/lib/api';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
@@ -37,16 +37,15 @@ export default function AlumniPage() {
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   
-  // 🚀 NEW: Frontend Pagination State (Load 12 at a time)
+  // Frontend Pagination State (Load 12 at a time)
   const [visibleCount, setVisibleCount] = useState(12);
 
   const router = useRouter();
 
   const fetchAlumni = async () => {
     try {
-      const res = await api.get('/users/alumni', {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-      });
+      // 🚀 FIXED: Removed the aggressive 'no-cache' headers to save backend bandwidth
+      const res = await api.get('/users/alumni');
       setAlumni(res.data.data);
     } catch (error) {
       console.error('Failed to load alumni directory');
@@ -61,7 +60,6 @@ export default function AlumniPage() {
         const userRes = await api.get('/users/me');
         setCurrentUser(userRes.data?.data || userRes.data?.user || userRes.data);
       } catch (e: any) {
-        // 🚀 THE FIX: Only redirect on a hard 401 Unauthorized
         if (e.response && e.response.status === 401) {
           router.push('/login');
         }
@@ -71,7 +69,7 @@ export default function AlumniPage() {
     init();
   }, [router]);
   
-  // 🚀 NEW: Reset visible count when filters change
+  // Reset visible count when filters change
   useEffect(() => {
     setVisibleCount(12);
   }, [searchTerm, departmentFilter, batchFilter]);
@@ -81,16 +79,24 @@ export default function AlumniPage() {
     fetchAlumni(); 
   };
 
-  const displayedAlumni = alumni.filter(a => {
-    const matchesSearch = `${a.firstName} ${a.lastName} ${a.currentPosition || ''}`.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = departmentFilter === 'All' || a.department === departmentFilter;
-    const matchesBatch = batchFilter === 'All' || a.batch === batchFilter;
-    return matchesSearch && matchesDept && matchesBatch;
-  });
+  // 🚀 FIXED: Wrapped in useMemo to prevent UI freezing on large datasets
+  const displayedAlumni = useMemo(() => {
+    return alumni.filter(a => {
+      const matchesSearch = `${a.firstName} ${a.lastName} ${a.currentPosition || ''}`.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDept = departmentFilter === 'All' || a.department === departmentFilter;
+      const matchesBatch = batchFilter === 'All' || a.batch === batchFilter;
+      return matchesSearch && matchesDept && matchesBatch;
+    });
+  }, [alumni, searchTerm, departmentFilter, batchFilter]);
 
-  // 🚀 NEW: Only slice the array up to the visible count!
+  // 🚀 FIXED: Wrapped in useMemo so it only calculates once when the data arrives
+  const uniqueBatches = useMemo(() => {
+    return Array.from(new Set(alumni.map(a => a.batch).filter(Boolean))).sort().reverse();
+  }, [alumni]);
+
+  // Only slice the array up to the visible count!
   const paginatedAlumni = displayedAlumni.slice(0, visibleCount);
-  const uniqueBatches = Array.from(new Set(alumni.map(a => a.batch).filter(Boolean))).sort().reverse();
+
   return (
     <>
     <ProtectedRoute>
@@ -185,7 +191,6 @@ export default function AlumniPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {/* 🚀 Changed to map over paginatedAlumni */}
               {paginatedAlumni.map(person => {
                 const fullName = `${person.firstName} ${person.lastName}`;
                 const status = person.connectionStatus;
@@ -208,7 +213,6 @@ export default function AlumniPage() {
                     <div className="px-5 sm:px-6 pb-5 sm:pb-6 relative flex flex-col flex-1">
                       <div className="flex justify-between items-start mb-2 sm:mb-3">
                         <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-white shadow-lg -mt-8 sm:-mt-10 bg-white shrink-0">
-                          {/* 🚀 ADDED NATIVE LAZY LOADING */}
                           <AvatarImage alt='user profile' src={optimizeImage(person.avatarUrl, 150, 150)} loading="lazy" decoding="async" className="object-cover" />
                           <AvatarFallback className="bg-slate-100 text-slate-600 text-xl sm:text-2xl font-black">{person.firstName[0]}</AvatarFallback>
                         </Avatar>
@@ -264,7 +268,7 @@ export default function AlumniPage() {
               })}
             </div>
 
-            {/* 🚀 NEW: Load More Button */}
+            {/* Load More Button */}
             {visibleCount < displayedAlumni.length && (
               <div className="flex justify-center mt-10 mb-8">
                 <button 

@@ -239,7 +239,7 @@ export default function ResourceCard({ resource }: { resource: any }) {
                   <div className="flex items-center justify-center gap-1.5">
                     <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                     <span className="hidden sm:inline whitespace-nowrap truncate">{isPPT ? 'Download PPT' : isZip ? 'Download ZIP' : 'Download'}</span>
-                    <span className="sm:hidden">Save</span>
+                    <span className="sm:hidden">Download</span>
                   </div>
                 )}
               </Button>

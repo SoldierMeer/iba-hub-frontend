@@ -269,7 +269,7 @@ export default function Navbar() {
                 <>
                   <div className="h-5 w-px bg-slate-200 mx-2" />
                   <NavLink href="/alumni" label="Alumni" />
-                  <NavLink href="/chat" label={user?.isAlumni ? "Messages" : "Connect"} />
+                  <NavLink href="/chat" label="Connect" />
                   <NavLink href="/voice" label="Voice" />
 
                   {/* 🚀 STUDENT: Dev Modal right after Voice */}

@@ -1,13 +1,17 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SlidersHorizontal } from 'lucide-react';
+import { useTransition } from 'react';
+import { SlidersHorizontal, Loader2 } from 'lucide-react';
 
 export default function ForumFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSort = searchParams.get('sort') || 'newest';
   const currentCategory = searchParams.get('category') || 'All';
+  
+  // 🚀 THE FIX: Background fetching state
+  const [isPending, startTransition] = useTransition();
 
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -18,14 +22,19 @@ export default function ForumFilters() {
       params.delete(key);
     }
     
-    // 🚀 THE FIX: Always reset to page 1 when changing filters or categories
     params.delete('page');
     
-    router.push(`?${params.toString()}`);
+    // 🚀 Smooth background fetch!
+    startTransition(() => {
+      router.push(`?${params.toString()}`);
+    });
   };
 
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 mb-6">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 mb-6 relative">
+      {/* 🚀 Tiny global spinner to show filters are applying */}
+      {isPending && <Loader2 className="absolute -top-6 right-0 w-4 h-4 text-indigo-600 animate-spin" />}
+
       {/* Tabs - Scrollable on mobile */}
       <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
         <div className="flex bg-slate-200/50 p-1 rounded-xl min-w-max">

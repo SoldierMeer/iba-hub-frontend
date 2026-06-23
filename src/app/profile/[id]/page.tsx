@@ -495,14 +495,13 @@ export default function ProfilePage() {
                         <InstagramIcon className="w-4 h-4" /> Instagram
                       </a>
                     )}
-                  </div>
-                )}
-                {/* Bottom Row: Portfolio Link */}
                     {user?.portfolio && (
-                      <a href={ensureHttps(user.portfolio)} aria-label="Portfolio Website" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow w-fit">
-                        <Globe className="w-4 h-4" /> Personal Portfolio Website
+                      <a href={ensureHttps(user.portfolio)} aria-label="Portfolio Website" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow">
+                        <Globe className="w-4 h-4" /> Portfolio Website
                       </a>
                     )}
+                  </div>
+                )}
                 </div>
               ) : (
                 <div className="mt-4 space-y-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl animate-in slide-in-from-top-2 duration-200">

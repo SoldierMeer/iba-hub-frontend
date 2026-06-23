@@ -8,7 +8,7 @@ import {
   Camera, Edit3, Save, X, Star, BookOpen, User as UserIcon, 
   MessageSquare, AlertCircle, FileText, ArrowRight, Crop, 
   Users, GraduationCap, Sparkles, CheckCircle2, Briefcase,
-  Hourglass, UserCheck, UserPlus, Globe
+  Hourglass, UserCheck, UserPlus, Globe, Loader2
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -66,6 +66,7 @@ export default function ProfilePage() {
   const [connectionStatus, setConnectionStatus] = useState<string>('none');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   
@@ -216,6 +217,7 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       const dataToSave = { 
         ...formData, 
@@ -230,6 +232,9 @@ export default function ProfilePage() {
       setIsEditing(false);
       toast.success("Profile updated successfully!");
     } catch (error) { toast.error("Failed to save profile"); }
+    finally {
+      setIsSaving(false); // 3. Stop the animation regardless of success/fail
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500 font-bold tracking-widest uppercase">Loading Profile...</div>;
@@ -325,70 +330,121 @@ export default function ProfilePage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3 z-10 pb-2">
+              {/* Action Buttons Container */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 z-10 pb-2 w-full sm:w-auto">
                 {isSelf ? (
                   !isEditing ? (
-                    <Button onClick={() => setIsEditing(true)} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
-                      <Edit3 className="w-4 h-4" /> Edit Profile
+                    <Button
+                      onClick={() => setIsEditing(true)}
+                      className="w-full sm:w-auto bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Edit Profile
                     </Button>
                   ) : (
-                    <div className="flex gap-2">
-                      <Button onClick={() => {
-                        setIsEditing(false);
-                        setFormData({
-                          bio: user?.bio || '', 
-                          department: user?.department || '', 
-                          semester: user?.semester || '', 
-                          section: user?.section || 'A', 
-                          currentPosition: user?.currentPosition || '',
-                          about: user?.about || '', 
-                          skills: user?.skills?.join(', ') || '', 
-                          avatarUrl: user?.avatarUrl || '', 
-                          bannerUrl: user?.bannerUrl || '',
-                          linkedin: user?.linkedin || '', 
-                          instagram: user?.instagram || '',
-                          github: user?.github || '' ,
-                          portfolio: user?.portfolio || ''
-                        });
-                      }} variant="outline" className="rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50">Cancel</Button>
-                      <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 font-bold shadow-md transition-all flex items-center gap-2">
-                        <Save className="w-4 h-4" /> Save Profile
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                      <Button
+                        onClick={() => {
+                          setIsEditing(false);
+
+                          setFormData({
+                            bio: user?.bio || '',
+                            department: user?.department || '',
+                            semester: user?.semester || '',
+                            section: user?.section || 'A',
+                            currentPosition: user?.currentPosition || '',
+                            about: user?.about || '',
+                            skills: user?.skills?.join(', ') || '',
+                            avatarUrl: user?.avatarUrl || '',
+                            bannerUrl: user?.bannerUrl || '',
+                            linkedin: user?.linkedin || '',
+                            instagram: user?.instagram || '',
+                            github: user?.github || '',
+                            portfolio: user?.portfolio || '',
+                          });
+                        }}
+                        variant="outline"
+                        className="flex-1 sm:flex-none rounded-xl px-6 h-11 font-bold text-slate-600 border-slate-200 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </Button>
+
+                      <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 font-bold shadow-md transition-all flex items-center justify-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Profile
+                          </>
+                        )}
                       </Button>
                     </div>
                   )
                 ) : (
                   <>
-                    {/* 1. MESSAGE BUTTON */}
-                    <Button 
-                      onClick={() => requireAuth(() => router.push(`/chat?userId=${user._id}`))}
-                      className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2"
+                    {/* Message Button */}
+                    <Button
+                      onClick={() =>
+                        requireAuth(() => router.push(`/chat?userId=${user._id}`))
+                      }
+                      className="w-full sm:w-auto bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center justify-center gap-2"
                     >
-                      <MessageSquare className="w-4 h-4" /> Message
+                      <MessageSquare className="w-4 h-4" />
+                      Message
                     </Button>
 
-                    {/* 2. CONNECTION BUTTON LOGIC */}
+                    {/* Connection Buttons */}
                     {connectionStatus === 'accepted' ? (
-                      <Button 
+                      <Button
                         onClick={() => {
-                          if(window.confirm("Are you sure you want to remove this connection?")) {
-                              handleConnectionAction('remove');
+                          if (
+                            window.confirm(
+                              'Are you sure you want to remove this connection?'
+                            )
+                          ) {
+                            handleConnectionAction('remove');
                           }
                         }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2"
+                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center justify-center gap-2"
                       >
-                        <CheckCircle2 className="w-4 h-4" /> Connected
+                        <CheckCircle2 className="w-4 h-4" />
+                        Connected
                       </Button>
                     ) : connectionStatus === 'pending_sent' ? (
-                      <Button disabled className="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-6 h-11 font-bold shadow-sm flex items-center gap-2 cursor-not-allowed">
-                        <Hourglass className="w-4 h-4" /> Request Sent
+                      <Button
+                        disabled
+                        className="w-full sm:w-auto bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-6 h-11 font-bold shadow-sm flex items-center justify-center gap-2 cursor-not-allowed"
+                      >
+                        <Hourglass className="w-4 h-4" />
+                        Request Sent
                       </Button>
                     ) : connectionStatus === 'pending_received' ? (
-                      <Button onClick={() => requireAuth(() => handleConnectionAction('accept'))} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
-                        <UserCheck className="w-4 h-4" /> Accept Request
+                      <Button
+                        onClick={() =>
+                          requireAuth(() => handleConnectionAction('accept'))
+                        }
+                        className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center justify-center gap-2"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        Accept Request
                       </Button>
                     ) : (
-                      <Button onClick={() => requireAuth(() => handleConnectionAction('send'))} className="bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center gap-2">
-                        <UserPlus className="w-4 h-4" /> Connect
+                      <Button
+                        onClick={() =>
+                          requireAuth(() => handleConnectionAction('send'))
+                        }
+                        className="w-full sm:w-auto bg-[#0f172a] hover:bg-slate-800 text-white rounded-xl px-6 h-11 font-bold shadow-sm transition-all flex items-center justify-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Connect
                       </Button>
                     )}
                   </>

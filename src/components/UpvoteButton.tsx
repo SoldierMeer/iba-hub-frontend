@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/api'; // 🚀 IMPORT YOUR CUSTOM API INSTANCE
 
 interface UpvoteButtonProps {
   apiUrl: string;
@@ -34,7 +34,8 @@ export default function UpvoteButton({ apiUrl, initialCount, initialVoteState = 
       
       setLoading(true);
       try {
-        const res = await axios.put(apiUrl, {}, { withCredentials: true });
+        // 🚀 THE FIX: Swapped raw axios for your custom 'api' instance
+        const res = await api.put(apiUrl);
         setCount(res.data.data.length); 
         setVoteState('up'); 
         router.refresh();
@@ -54,7 +55,8 @@ export default function UpvoteButton({ apiUrl, initialCount, initialVoteState = 
       
       setLoading(true);
       try {
-        const res = await axios.put(apiUrl, {}, { withCredentials: true });
+        // 🚀 THE FIX: Swapped raw axios for your custom 'api' instance
+        const res = await api.put(apiUrl);
         setCount(res.data.data.length); 
         setVoteState('none'); 
         router.refresh();

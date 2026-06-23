@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast'; // 🚀 Added toast for better UX
+import api from '@/lib/api'; // 🚀 Import your configured Axios instance
 
 export default function CreatePostModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -33,22 +34,15 @@ export default function CreatePostModal() {
 
     // 🚀 3. BACKGROUND FETCH
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/forum`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: payload.title,
-          content: payload.content,
-          category: payload.category, 
-          tags: processedTags
-        })
+      // Swapped raw fetch for your custom api instance!
+      await api.post('/forum', {
+        title: payload.title,
+        content: payload.content,
+        category: payload.category, 
+        tags: processedTags
       });
 
-      if (!res.ok) throw new Error('Failed to create post');
-
       // 🚀 4. SILENT DATA REFRESH
-      // This fetches the new data from the server and magically pops it onto the screen
       router.refresh(); 
       
     } catch (error) {

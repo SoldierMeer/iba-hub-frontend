@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast'; // 🚀 Added toast
+import api from '@/lib/api'; // 🚀 Import your configured Axios instance
 
 export default function ReplyForm({ postId }: { postId: string }) {
   const [content, setContent] = useState('');
@@ -25,15 +26,12 @@ export default function ReplyForm({ postId }: { postId: string }) {
       toast.success("Sending reply...");
 
       // 🚀 3. BACKGROUND FETCH
+      // 🚀 3. BACKGROUND FETCH
       try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/forum/${postId}/replies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include', 
-          body: JSON.stringify({ content: payload })
+        // Swapped raw fetch for your custom api instance!
+        await api.post(`/forum/${postId}/replies`, { 
+          content: payload 
         });
-
-        if (!res.ok) throw new Error('Failed to post reply');
 
         // 🚀 4. SILENT DATA REFRESH
         router.refresh();
@@ -41,7 +39,6 @@ export default function ReplyForm({ postId }: { postId: string }) {
       } catch (error) {
         console.error(error);
         toast.error('Failed to post reply. Please try again.');
-        // Optional: Revert the text box if it failed so they don't lose their typing
         setContent(payload); 
       }
     });
